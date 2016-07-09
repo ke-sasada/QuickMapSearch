@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">QuickMapSearch</string>
+    <string name="toast_requires_permission">This application requires permission %s</string>
+    <string name="places_api_url">https://maps.googleapis.com</string>
 </resources>
