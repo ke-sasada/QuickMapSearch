@@ -13,12 +13,15 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.Toast;
 
@@ -125,7 +128,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         spinnerButton = (Button)findViewById(R.id.spinner_button);
         spinnerAdapter = new ArrayAdapter<String>(this,
                 android.R.layout.simple_list_item_single_choice);
-        spinnerAdapter.addAll(mkDataList(10));
         spinnerButton.setOnClickListener(onClickListener);
 
     }
@@ -266,26 +268,65 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     }
                     break;
                 case R.id.spinner_button:
-                    AlertDialog.Builder builder = new AlertDialog.Builder(
-                            MainActivity.this);
-                    builder.setTitle("テスト");
-                    builder.setSingleChoiceItems(spinnerAdapter, buttonSelectedIndex,
-                            new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialogInterface, int i) {
-                                    buttonSelectedIndex = i;
-                                    String item = spinnerAdapter.getItem(i);
-                                    spinnerButton.setText(item);
-                                }
-                            });
-
-                    builder.setPositiveButton("OK",null);
-                    buttonAlertDialog = builder.create();
-                    buttonAlertDialog.show();
+                    createListDialog();
+                    break;
 
             }
             Log.d(TAG,"onClickended");
         }
+
+        private void createListDialog(){
+            LayoutInflater inflater = (LayoutInflater)getSystemService(LAYOUT_INFLATER_SERVICE);
+            final View layout = inflater.inflate(R.layout.itemselect_dialog,
+                    (ViewGroup)findViewById(R.id.layout_root));
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(
+                    MainActivity.this);
+            builder.setTitle("テスト");
+            builder.setView(layout);
+
+            builder.setPositiveButton("OK",null);
+            builder.setNeutralButton("+",null);
+
+            ListView bookMark = (ListView)layout.findViewById(R.id.listView);
+            bookMark.setAdapter(spinnerAdapter);
+            buttonAlertDialog = builder.create();
+
+            buttonAlertDialog.show();
+            Button addButton = buttonAlertDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+            addButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    createAddListDialog();
+                }
+            });
+        }
+
+        private void createAddListDialog(){
+            LayoutInflater inflater = (LayoutInflater)getSystemService(LAYOUT_INFLATER_SERVICE);
+            final View layout = inflater.inflate(R.layout.itemselect_dialog,
+                    (ViewGroup)findViewById(R.id.layout_root));
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(
+                    MainActivity.this);
+            builder.setTitle("テスト");
+            builder.setView(layout);
+
+            builder.setPositiveButton("OK",null);
+            builder.setNeutralButton("+",null);
+
+            ListView bookMark = (ListView)layout.findViewById(R.id.listView);
+            bookMark.setAdapter(spinnerAdapter);
+            buttonAlertDialog = builder.create();
+
+            buttonAlertDialog.show();
+            Button addButton = buttonAlertDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+            addButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+
+                }
+            });        }
     };
 
     private Callback<Response> resultCallBack = new Callback<Response>(){
@@ -365,6 +406,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Log.d(TAG,"callback ended");
         }
 
+
         @Override
         public void onFailure(Call<Response> call, Throwable t) {
             t.printStackTrace();
@@ -372,15 +414,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     };
-
-    private List<String> mkDataList(int cnt){
-        List<String> list = new ArrayList<>();
-        for(int i = 0; i < cnt; i++){
-            list.add(String.valueOf(i));
-        }
-        return list;
-    }
-
 
 }
 
