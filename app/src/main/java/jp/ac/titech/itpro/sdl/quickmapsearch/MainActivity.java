@@ -1,6 +1,7 @@
 package jp.ac.titech.itpro.sdl.quickmapsearch;
 
 import android.Manifest;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -8,13 +9,17 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -30,6 +35,7 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.StreetViewPanoramaCamera;
 
 import java.net.URL;
 import java.util.ArrayList;
@@ -60,6 +66,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private GoogleApiClient googleApiClient;
 
     private Button searchButton;
+    private Button spinnerButton;
+    private ArrayAdapter<String> spinnerAdapter;
 
     private final static String[] PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -73,6 +81,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private int maxItemSize;
 
     private Map<String,Bitmap> iconMap;
+    private int buttonSelectedIndex = 0;
+    private AlertDialog buttonAlertDialog;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -91,7 +102,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         helper = new PlaceApiHelper(this);
 
         searchButton = (Button) findViewById(R.id.search_button);
-        searchButton.setOnClickListener(onSearchButtonClickListener);
+        searchButton.setOnClickListener(onClickListener);
 
         allResult = new ArrayList<ResultList>();
         currentLatLng = new LatLng(0,0);
@@ -110,6 +121,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         itemList.addItem(item);
 
         iconMap = new HashMap<String, Bitmap>();
+
+        spinnerButton = (Button)findViewById(R.id.spinner_button);
+        spinnerAdapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_single_choice);
+        spinnerAdapter.addAll(mkDataList(10));
+        spinnerButton.setOnClickListener(onClickListener);
 
     }
 
@@ -231,21 +248,42 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         state = UpdatingState.STOPPED;
     }
 
-    private View.OnClickListener onSearchButtonClickListener = new View.OnClickListener() {
+    private View.OnClickListener onClickListener = new View.OnClickListener() {
 
         @Override
         public void onClick(View view) {
             Log.d(TAG, "onClick");
-            allResult.clear();
+            switch(view.getId()){
+                case R.id.search_button:
+                    allResult.clear();
 
-            maxItemSize = itemList.getItemList().size();
-            count = 0;
-            for (SearchItem item : itemList.getItemList()) {
-                {
-                    helper.requestPlaces(item.getWord(), currentLatLng, 500, resultCallBack);
-                }
+                    maxItemSize = itemList.getItemList().size();
+                    count = 0;
+                    for (SearchItem item : itemList.getItemList()) {
+                        {
+                            helper.requestPlaces(item.getWord(), currentLatLng, 500, resultCallBack);
+                        }
+                    }
+                    break;
+                case R.id.spinner_button:
+                    AlertDialog.Builder builder = new AlertDialog.Builder(
+                            MainActivity.this);
+                    builder.setTitle("テスト");
+                    builder.setSingleChoiceItems(spinnerAdapter, buttonSelectedIndex,
+                            new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialogInterface, int i) {
+                                    buttonSelectedIndex = i;
+                                    String item = spinnerAdapter.getItem(i);
+                                    spinnerButton.setText(item);
+                                }
+                            });
+
+                    builder.setPositiveButton("OK",null);
+                    buttonAlertDialog = builder.create();
+                    buttonAlertDialog.show();
+
             }
-
             Log.d(TAG,"onClickended");
         }
     };
@@ -334,6 +372,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     };
+
+    private List<String> mkDataList(int cnt){
+        List<String> list = new ArrayList<>();
+        for(int i = 0; i < cnt; i++){
+            list.add(String.valueOf(i));
+        }
+        return list;
+    }
 
 
 }
