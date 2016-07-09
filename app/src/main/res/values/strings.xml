@@ -3,4 +3,9 @@
     <string name="toast_requires_permission">This application requires permission %s</string>
     <string name="places_api_url">https://maps.googleapis.com</string>
     <string name="menu_map">test</string>
+    <string-array name="genre_list">
+        <item>police</item>
+        <item>bank</item>
+        <item>post_office</item>
+    </string-array>
 </resources>

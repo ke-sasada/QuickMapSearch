@@ -18,11 +18,9 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.ListView;
-import android.widget.Spinner;
+import android.widget.GridView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -37,8 +35,6 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.model.StreetViewPanoramaCamera;
 
 import java.net.URL;
 import java.util.ArrayList;
@@ -71,6 +67,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private Button searchButton;
     private Button spinnerButton;
     private ArrayAdapter<String> spinnerAdapter;
+    private ArrayAdapter<String> genreAdapter;
 
     private final static String[] PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -85,8 +82,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private Map<String,Bitmap> iconMap;
     private int buttonSelectedIndex = 0;
-    private AlertDialog buttonAlertDialog;
+    private AlertDialog selectListDialog;
+    private AlertDialog addListDialog;
+    private SearchItemList selectedList;
 
+    private HashMap<String,SearchItemList> itemListHashMap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -108,7 +108,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         searchButton.setOnClickListener(onClickListener);
 
         allResult = new ArrayList<ResultList>();
-        currentLatLng = new LatLng(0,0);
+        currentLatLng = new LatLng(0, 0);
 
         locationRequest = new LocationRequest();
         locationRequest.setInterval(10000);
@@ -116,21 +116,37 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
 
         itemList = new SearchItemList("test");
-        SearchItem item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,"school",BitmapDescriptorFactory.HUE_GREEN);
+        SearchItem item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, "school", BitmapDescriptorFactory.HUE_GREEN);
         itemList.addItem(item);
-        item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,"toilet", BitmapDescriptorFactory.HUE_AZURE);
+        item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, "toilet", BitmapDescriptorFactory.HUE_AZURE);
         itemList.addItem(item);
-        item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,"food", BitmapDescriptorFactory.HUE_RED);
+        item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, "food", BitmapDescriptorFactory.HUE_RED);
         itemList.addItem(item);
 
         iconMap = new HashMap<String, Bitmap>();
 
-        spinnerButton = (Button)findViewById(R.id.spinner_button);
+        spinnerButton = (Button) findViewById(R.id.spinner_button);
         spinnerAdapter = new ArrayAdapter<String>(this,
                 android.R.layout.simple_list_item_single_choice);
         spinnerButton.setOnClickListener(onClickListener);
+        genreAdapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_single_choice);
 
+        // test data
+        itemListHashMap = new HashMap<String,SearchItemList>();
+        SearchItem s = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,"toilet",0.0f);
+        ArrayList<SearchItem> sl = new ArrayList<SearchItem>();
+        sl.add(s);
+        SearchItemList l = new SearchItemList("Test",sl);
+        itemListHashMap.put(l.getName(),l);
+        s = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,"school",0.0f);
+        sl = new ArrayList<SearchItem>();
+        sl.add(s);
+        l = new SearchItemList("Test2",sl);
+        itemListHashMap.put(l.getName(),l);
+        //
     }
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu){
@@ -258,13 +274,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             switch(view.getId()){
                 case R.id.search_button:
                     allResult.clear();
-
-                    maxItemSize = itemList.getItemList().size();
-                    count = 0;
-                    for (SearchItem item : itemList.getItemList()) {
-                        {
-                            helper.requestPlaces(item.getWord(), currentLatLng, 500, resultCallBack);
+                    if(selectedList != null) {
+                        maxItemSize = selectedList.getItemList().size();
+                        count = 0;
+                        for (SearchItem item : selectedList.getItemList()) {
+                            {
+                                helper.requestPlaces(item.getWord(), currentLatLng, 500, resultCallBack);
+                            }
                         }
+                    }else{
+                        Log.d(TAG,"not selected");
                     }
                     break;
                 case R.id.spinner_button:
@@ -272,61 +291,68 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     break;
 
             }
-            Log.d(TAG,"onClickended");
+            Log.d(TAG,"onClick_ended");
         }
 
         private void createListDialog(){
-            LayoutInflater inflater = (LayoutInflater)getSystemService(LAYOUT_INFLATER_SERVICE);
-            final View layout = inflater.inflate(R.layout.itemselect_dialog,
-                    (ViewGroup)findViewById(R.id.layout_root));
 
             AlertDialog.Builder builder = new AlertDialog.Builder(
                     MainActivity.this);
-            builder.setTitle("テスト");
-            builder.setView(layout);
+            builder.setTitle("ブックマーク");
 
             builder.setPositiveButton("OK",null);
             builder.setNeutralButton("+",null);
+            spinnerAdapter.clear();
+            spinnerAdapter.addAll(itemListHashMap.keySet());
 
-            ListView bookMark = (ListView)layout.findViewById(R.id.listView);
-            bookMark.setAdapter(spinnerAdapter);
-            buttonAlertDialog = builder.create();
+            builder.setSingleChoiceItems(spinnerAdapter, buttonSelectedIndex, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+                    buttonSelectedIndex = i;
 
-            buttonAlertDialog.show();
-            Button addButton = buttonAlertDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+                }
+            });
+
+            selectListDialog = builder.create();
+
+            selectListDialog.show();
+            Button addButton = selectListDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
             addButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
                     createAddListDialog();
                 }
             });
+            Button okButton = selectListDialog.getButton(DialogInterface.BUTTON_POSITIVE);
+            okButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    String name = spinnerAdapter.getItem(buttonSelectedIndex);
+                    selectedList = itemListHashMap.get(name);
+                    selectListDialog.dismiss();
+                }
+            });
         }
 
-        private void createAddListDialog(){
-            LayoutInflater inflater = (LayoutInflater)getSystemService(LAYOUT_INFLATER_SERVICE);
-            final View layout = inflater.inflate(R.layout.itemselect_dialog,
-                    (ViewGroup)findViewById(R.id.layout_root));
+        private void createAddListDialog() {
 
             AlertDialog.Builder builder = new AlertDialog.Builder(
                     MainActivity.this);
-            builder.setTitle("テスト");
-            builder.setView(layout);
-
-            builder.setPositiveButton("OK",null);
-            builder.setNeutralButton("+",null);
-
-            ListView bookMark = (ListView)layout.findViewById(R.id.listView);
-            bookMark.setAdapter(spinnerAdapter);
-            buttonAlertDialog = builder.create();
-
-            buttonAlertDialog.show();
-            Button addButton = buttonAlertDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
-            addButton.setOnClickListener(new View.OnClickListener() {
+            builder.setTitle("追加");
+            builder.setPositiveButton("OK", null);
+            String[] genreList = getResources().getStringArray(R.array.genre_list);
+            final ArrayList<Integer> checkedItems = new ArrayList<Integer>();
+            builder.setMultiChoiceItems(genreList, null, new DialogInterface.OnMultiChoiceClickListener() {
                 @Override
-                public void onClick(View view) {
-
+                public void onClick(DialogInterface dialogInterface, int i, boolean b) {
+                    if(b)checkedItems.add(i);
+                    else checkedItems.remove((Integer)i);
                 }
-            });        }
+            });
+            addListDialog = builder.create();
+            addListDialog.show();
+
+        }
     };
 
     private Callback<Response> resultCallBack = new Callback<Response>(){
@@ -365,7 +391,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             if(count == maxItemSize){
                 for(ResultList resultList: allResult){
                     for(Result r:resultList.getResultList()) {
-                        Log.d(TAG,r.getName());
                         Location location = r.getGeometry().getLocation();
                         LatLng latLng = new LatLng(location.getLat(), location.getLng());
                         String name = r.getName();
@@ -399,7 +424,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         }
                     }
                 }
-                googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 17));
+                googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16));
                 Log.d(TAG,"viewMarker");
             }
 
