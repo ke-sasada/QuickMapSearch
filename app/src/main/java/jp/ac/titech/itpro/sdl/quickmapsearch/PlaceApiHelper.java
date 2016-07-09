@@ -1,6 +1,7 @@
 package jp.ac.titech.itpro.sdl.quickmapsearch;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.google.android.gms.maps.model.LatLng;
 
@@ -35,5 +36,7 @@ public class PlaceApiHelper {
                 "false",
                 context.getString(R.string.api_google_maps_key_browser));
         call.enqueue(callback);
+
+        Log.d(TAG,"requestPlaces ended");
     }
 }

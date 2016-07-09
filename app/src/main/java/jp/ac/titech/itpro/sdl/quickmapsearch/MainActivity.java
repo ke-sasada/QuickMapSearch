@@ -1,9 +1,9 @@
 package jp.ac.titech.itpro.sdl.quickmapsearch;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.pm.PackageManager;
-import android.location.LocationManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
@@ -11,6 +11,8 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
@@ -24,11 +26,17 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -43,7 +51,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private enum UpdatingState {STOPPED, REQUESTING, STARTED}
     private UpdatingState state = UpdatingState.STOPPED;
-    private List<Result> resultList;
+    private List<ResultList> allResult;
 
 
     private GoogleMap googleMap;
@@ -58,6 +66,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Manifest.permission.ACCESS_FINE_LOCATION
     };
     private final static int REQCODE_PERMISSIONS = 1111;
+
+    private SearchItemList itemList;
+
+    private int count;
+    private int maxItemSize;
+
+    private Map<String,Bitmap> iconMap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,7 +93,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         searchButton = (Button) findViewById(R.id.search_button);
         searchButton.setOnClickListener(onSearchButtonClickListener);
 
-        resultList = new ArrayList<Result>();
+        allResult = new ArrayList<ResultList>();
         currentLatLng = new LatLng(0,0);
 
         locationRequest = new LocationRequest();
@@ -86,7 +101,30 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         locationRequest.setFastestInterval(5000);
         locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
 
+        itemList = new SearchItemList("test");
+        SearchItem item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,"school",BitmapDescriptorFactory.HUE_GREEN);
+        itemList.addItem(item);
+        item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,"toilet", BitmapDescriptorFactory.HUE_AZURE);
+        itemList.addItem(item);
+        item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,"food", BitmapDescriptorFactory.HUE_RED);
+        itemList.addItem(item);
 
+        iconMap = new HashMap<String, Bitmap>();
+
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu){
+        getMenuInflater().inflate(R.menu.menu,menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item){
+        switch(item.getItemId()){
+            default:
+                return super.onOptionsItemSelected(item);
+        }
     }
 
     @Override
@@ -125,6 +163,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     public void onMapReady(GoogleMap googleMap) {
         Log.d(TAG,"onMapReady");
         this.googleMap = googleMap;
+        googleMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+            @Override
+            public boolean onMarkerClick(Marker marker) {
+                marker.showInfoWindow();
+                return true;
+            }
+        });
     }
 
     @Override
@@ -191,9 +236,17 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         @Override
         public void onClick(View view) {
             Log.d(TAG, "onClick");
-            resultList.clear();
-            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng,15));
-            helper.requestPlaces("toilet", currentLatLng, 500, resultCallBack);
+            allResult.clear();
+
+            maxItemSize = itemList.getItemList().size();
+            count = 0;
+            for (SearchItem item : itemList.getItemList()) {
+                {
+                    helper.requestPlaces(item.getWord(), currentLatLng, 500, resultCallBack);
+                }
+            }
+
+            Log.d(TAG,"onClickended");
         }
     };
 
@@ -203,14 +256,75 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Log.d(TAG,"onResponse");
 
             googleMap.clear();
-            List<Result> results = response.body().getResults();
-            resultList.addAll(results);
-            for(Result r:resultList){
-                Location location = r.getGeometry().getLocation();
-                LatLng latLng = new LatLng(location.getLat(),location.getLng());
-                String name = r.getName();
-                googleMap.addMarker(new MarkerOptions().position(latLng).title(name));
+            ResultList results = new ResultList(response.body().getResults(),itemList.getItemList().get(count).getMarkerOptions());
+
+            Iterator itr = results.getResultList().iterator();
+
+            while(itr.hasNext()){
+                Result result = (Result)itr.next();
+                boolean isExist = false;
+
+                for(ResultList rList:allResult){
+                    for(Result r:rList.getResultList()){
+                        if(result.getName().equals(r.getName())) {
+                            isExist = true;
+                            break;
+                        }
+                    }
+                    if(isExist){
+                        break;
+                    }
+                }
+                if(isExist){
+                    itr.remove();
+                }
             }
+
+            allResult.add(results);
+
+            count++;
+            if(count == maxItemSize){
+                for(ResultList resultList: allResult){
+                    for(Result r:resultList.getResultList()) {
+                        Log.d(TAG,r.getName());
+                        Location location = r.getGeometry().getLocation();
+                        LatLng latLng = new LatLng(location.getLat(), location.getLng());
+                        String name = r.getName();
+                        final String iconURL = r.getIcon();
+                        if(!iconMap.containsKey(iconURL)){
+                            Thread thread = new Thread(new Runnable(){
+                                @Override
+                                public void run(){
+                                    URL url ;
+                                    try {
+                                        url = new URL(iconURL);
+                                        Bitmap bmp = BitmapFactory.decodeStream(url.openConnection().getInputStream());
+                                        iconMap.put(iconURL,bmp);
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    }
+                                    Log.d(TAG,"endBitMapThread");
+                                }
+                            });
+                            thread.start();
+                            try {
+                                thread.join();
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                            Log.d(TAG,"endMainThread");
+                        }
+                        if(iconMap.containsKey(iconURL)) {
+                            googleMap.addMarker(resultList.getMarkerOptions().position(latLng).title(name)
+                                    .icon(BitmapDescriptorFactory.fromBitmap(iconMap.get(iconURL))));
+                        }
+                    }
+                }
+                googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 17));
+                Log.d(TAG,"viewMarker");
+            }
+
+            Log.d(TAG,"callback ended");
         }
 
         @Override
