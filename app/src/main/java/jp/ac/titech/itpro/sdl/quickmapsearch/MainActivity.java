@@ -1,6 +1,7 @@
 package jp.ac.titech.itpro.sdl.quickmapsearch;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -21,6 +22,7 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.GridView;
+import android.widget.ListView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -35,11 +37,19 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -49,6 +59,12 @@ import retrofit2.Callback;
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
     private static final String TAG = MainActivity.class.getSimpleName();
+
+
+    private final static String[] PERMISSIONS = {
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION
+    };
 
     private android.location.Location currentLocation;
     private LatLng currentLatLng;
@@ -60,38 +76,45 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     private GoogleMap googleMap;
+    private GoogleApiClient googleApiClient;
     private MapFragment mapFragment;
     private LocationRequest locationRequest;
-    private GoogleApiClient googleApiClient;
 
     private Button searchButton;
     private Button spinnerButton;
+    private Button debug_FileDeleteButton;
     private ArrayAdapter<String> spinnerAdapter;
     private ArrayAdapter<String> genreAdapter;
 
-    private final static String[] PERMISSIONS = {
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.ACCESS_FINE_LOCATION
-    };
     private final static int REQCODE_PERMISSIONS = 1111;
-
-    private SearchItemList itemList;
-
     private int count;
     private int maxItemSize;
-
-    private Map<String,Bitmap> iconMap;
     private int buttonSelectedIndex = 0;
+
+    private HashMap<String,Bitmap> iconMap;
+
     private AlertDialog selectListDialog;
     private AlertDialog addListDialog;
-    private SearchItemList selectedList;
+    private LinkedHashMap<String,SearchItemList> itemListHashMap;
 
-    private HashMap<String,SearchItemList> itemListHashMap;
+    private SearchItemList selectedList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        try{
+            FileInputStream fis = openFileInput("BookMark.dat");
+            ObjectInputStream ois = new ObjectInputStream(fis);
+            itemListHashMap = (LinkedHashMap<String, SearchItemList>) ois.readObject();
+            Log.d(TAG,"loading 'BookMark.dat' completed");
+        } catch (FileNotFoundException e){
+            Log.d(TAG,"File not Found. Start no file.");
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
 
         mapFragment = (MapFragment) getFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
@@ -106,6 +129,19 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         searchButton = (Button) findViewById(R.id.search_button);
         searchButton.setOnClickListener(onClickListener);
+        debug_FileDeleteButton = (Button) findViewById((R.id.debug_file_delete));
+        debug_FileDeleteButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                try{
+                    Log.d(TAG,"delete file");
+                    deleteFile("BookMark.dat");
+                    Toast.makeText(MainActivity.this,"Debug:Delete 'BookMark.dat' completed",Toast.LENGTH_LONG).show();
+                }catch(Exception e){
+                    e.printStackTrace();
+                }
+            }
+        });
 
         allResult = new ArrayList<ResultList>();
         currentLatLng = new LatLng(0, 0);
@@ -114,14 +150,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         locationRequest.setInterval(10000);
         locationRequest.setFastestInterval(5000);
         locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
-
-        itemList = new SearchItemList("test");
-        SearchItem item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, "school", BitmapDescriptorFactory.HUE_GREEN);
-        itemList.addItem(item);
-        item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, "toilet", BitmapDescriptorFactory.HUE_AZURE);
-        itemList.addItem(item);
-        item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, "food", BitmapDescriptorFactory.HUE_RED);
-        itemList.addItem(item);
 
         iconMap = new HashMap<String, Bitmap>();
 
@@ -133,18 +161,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 android.R.layout.simple_list_item_single_choice);
 
         // test data
-        itemListHashMap = new HashMap<String,SearchItemList>();
-        SearchItem s = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,"toilet",0.0f);
-        ArrayList<SearchItem> sl = new ArrayList<SearchItem>();
-        sl.add(s);
-        SearchItemList l = new SearchItemList("Test",sl);
-        itemListHashMap.put(l.getName(),l);
-        s = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,"school",0.0f);
-        sl = new ArrayList<SearchItem>();
-        sl.add(s);
-        l = new SearchItemList("Test2",sl);
-        itemListHashMap.put(l.getName(),l);
-        //
+        if(itemListHashMap == null || itemListHashMap.size() == 0) {
+            itemListHashMap = new LinkedHashMap<String, SearchItemList>();
+            SearchItem s = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, "toilet", 0.0f);
+            ArrayList<SearchItem> sl = new ArrayList<SearchItem>();
+            sl.add(s);
+            SearchItemList l = new SearchItemList(0, "Test", sl);
+            itemListHashMap.put(l.getName(), l);
+            s = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, "school", 0.0f);
+            sl = new ArrayList<SearchItem>();
+            sl.add(s);
+            l = new SearchItemList(1, "Test2", sl);
+            itemListHashMap.put(l.getName(), l);
+            //
+        }
     }
 
 
@@ -191,6 +221,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onStop() {
         Log.d(TAG, "onStop");
         googleApiClient.disconnect();
+
         super.onStop();
     }
 
@@ -268,6 +299,103 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private View.OnClickListener onClickListener = new View.OnClickListener() {
 
+        private void createListDialog(){
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(
+                    MainActivity.this);
+            builder.setTitle("ブックマーク");
+
+            builder.setPositiveButton("OK",null);
+            builder.setNeutralButton("+",null);
+            spinnerAdapter.clear();
+            for(SearchItemList list:itemListHashMap.values()) {
+                spinnerAdapter.add(list.getName());
+            }
+
+            builder.setSingleChoiceItems(spinnerAdapter, buttonSelectedIndex, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+                    buttonSelectedIndex = i;
+                }
+            });
+
+            selectListDialog = builder.create();
+
+            selectListDialog.show();
+            Button addButton = selectListDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+            addButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if(itemListHashMap.size() < 10) {
+                        createAddListDialog();
+                    }else{
+                        Toast.makeText(getApplicationContext(),"Up to 10",Toast.LENGTH_LONG).show();
+                    }
+                }
+            });
+            Button okButton = selectListDialog.getButton(DialogInterface.BUTTON_POSITIVE);
+            okButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    selectedList = itemListHashMap.get(spinnerAdapter.getItem(buttonSelectedIndex));
+                    spinnerButton.setText(selectedList.getName());
+                    try{
+                        FileOutputStream fos = openFileOutput("BookMark.dat",MODE_PRIVATE);
+                        ObjectOutputStream oos = new ObjectOutputStream(fos);
+                        oos.writeObject(itemListHashMap);
+                        oos.close();
+                        Log.d(TAG,"saving 'BookMark.dat' completed");
+                    }catch (Exception e){
+                        e.printStackTrace();
+                    }
+                    selectListDialog.dismiss();
+                }
+            });
+        }
+
+        private void createAddListDialog() {
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(
+                    MainActivity.this);
+            builder.setTitle("追加");
+            builder.setPositiveButton("OK", null);
+            builder.setNegativeButton("Cancel",null);
+            final String[] genreList = getResources().getStringArray(R.array.genre_list);
+            final ArrayList<Integer> checkedItems = new ArrayList<Integer>();
+            builder.setMultiChoiceItems(genreList, null, new DialogInterface.OnMultiChoiceClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i, boolean b) {
+                    if(b)checkedItems.add(i);
+                    else checkedItems.remove((Integer)i);
+                }
+            });
+            addListDialog = builder.create();
+            addListDialog.show();
+
+            Button okButton = addListDialog.getButton(DialogInterface.BUTTON_POSITIVE);
+            okButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    SearchItemList list = new SearchItemList(itemListHashMap.size()+1,String.valueOf(itemListHashMap.size()+1));
+                    for(int i : checkedItems){
+                        if(i < genreList.length) {
+                            SearchItem item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,genreList[i],0.0f);
+                            list.addItem(item);
+                        }
+                    }
+                    if(list.getItemList().size() == 0){
+                        Toast.makeText(MainActivity.this,"no selected",Toast.LENGTH_LONG).show();
+                    }else {
+                        itemListHashMap.put(list.getName(), list);
+                        spinnerAdapter.add(list.getName());
+                        addListDialog.dismiss();
+                        Log.d(TAG, "endaddButtonClick");
+                    }
+                }
+            });
+
+        }
+
         @Override
         public void onClick(View view) {
             Log.d(TAG, "onClick");
@@ -293,66 +421,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
             Log.d(TAG,"onClick_ended");
         }
-
-        private void createListDialog(){
-
-            AlertDialog.Builder builder = new AlertDialog.Builder(
-                    MainActivity.this);
-            builder.setTitle("ブックマーク");
-
-            builder.setPositiveButton("OK",null);
-            builder.setNeutralButton("+",null);
-            spinnerAdapter.clear();
-            spinnerAdapter.addAll(itemListHashMap.keySet());
-
-            builder.setSingleChoiceItems(spinnerAdapter, buttonSelectedIndex, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i) {
-                    buttonSelectedIndex = i;
-
-                }
-            });
-
-            selectListDialog = builder.create();
-
-            selectListDialog.show();
-            Button addButton = selectListDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
-            addButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    createAddListDialog();
-                }
-            });
-            Button okButton = selectListDialog.getButton(DialogInterface.BUTTON_POSITIVE);
-            okButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    String name = spinnerAdapter.getItem(buttonSelectedIndex);
-                    selectedList = itemListHashMap.get(name);
-                    selectListDialog.dismiss();
-                }
-            });
-        }
-
-        private void createAddListDialog() {
-
-            AlertDialog.Builder builder = new AlertDialog.Builder(
-                    MainActivity.this);
-            builder.setTitle("追加");
-            builder.setPositiveButton("OK", null);
-            String[] genreList = getResources().getStringArray(R.array.genre_list);
-            final ArrayList<Integer> checkedItems = new ArrayList<Integer>();
-            builder.setMultiChoiceItems(genreList, null, new DialogInterface.OnMultiChoiceClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i, boolean b) {
-                    if(b)checkedItems.add(i);
-                    else checkedItems.remove((Integer)i);
-                }
-            });
-            addListDialog = builder.create();
-            addListDialog.show();
-
-        }
     };
 
     private Callback<Response> resultCallBack = new Callback<Response>(){
@@ -361,7 +429,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Log.d(TAG,"onResponse");
 
             googleMap.clear();
-            ResultList results = new ResultList(response.body().getResults(),itemList.getItemList().get(count).getMarkerOptions());
+            MarkerOptions mo = new MarkerOptions().icon(BitmapDescriptorFactory.defaultMarker(selectedList.getItemList().get(count).getColor()));
+            ResultList results = new ResultList(response.body().getResults(),mo);
 
             Iterator itr = results.getResultList().iterator();
 
@@ -384,9 +453,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     itr.remove();
                 }
             }
-
             allResult.add(results);
-
             count++;
             if(count == maxItemSize){
                 for(ResultList resultList: allResult){
@@ -427,17 +494,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16));
                 Log.d(TAG,"viewMarker");
             }
-
             Log.d(TAG,"callback ended");
         }
-
-
         @Override
         public void onFailure(Call<Response> call, Throwable t) {
             t.printStackTrace();
         }
-
-
     };
 
 }
