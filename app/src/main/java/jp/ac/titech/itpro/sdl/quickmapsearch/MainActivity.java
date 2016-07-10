@@ -5,6 +5,7 @@ import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
@@ -68,7 +69,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
     private static final String TAG = MainActivity.class.getSimpleName();
 
-    private static final int MAX_WAYPOINTS = 1;
+    private static final int MAX_WAYPOINTS = 4;
 
     private final static String[] PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -266,6 +267,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     public void onMapReady(final GoogleMap googleMap) {
         Log.d(TAG, "onMapReady");
         this.googleMap = googleMap;
+        googleMap.getUiSettings().setCompassEnabled(true);
         googleMap.setOnInfoWindowLongClickListener(new GoogleMap.OnInfoWindowLongClickListener() {
             @Override
             public void onInfoWindowLongClick(Marker marker) {
@@ -273,8 +275,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     Toast.makeText(MainActivity.this,"同じ地点は連続して登録出来ません",Toast.LENGTH_SHORT).show();
                 }else{
                     Toast.makeText(MainActivity.this,marker.getTitle() + "が登録されました",Toast.LENGTH_SHORT).show();
-                    rootList.clear();
-                    rootList.addLast(currentPositionMarker);
                     rootList.addLast(marker);
                     directionHelper.requestPlaces(rootList,directionResponceCallback);
                    // dataList.add(marker.getTitle());
@@ -308,6 +308,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16));
             firstAnimated = true;
             currentPositionMarker = googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置"));
+            rootList.add(currentPositionMarker);
         }
     }
 
@@ -456,6 +457,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 case R.id.search_button:
                     allResult.clear();
                     if(selectedList != null) {
+                        if(rootLine != null) {
+                            rootLine.remove();
+                            rootList.clear();
+                            rootList.add(currentPositionMarker);
+                        }
                         maxItemSize = selectedList.getItemList().size();
                         count = 0;
                         for (SearchItem item : selectedList.getItemList()) {
@@ -471,8 +477,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     createListDialog();
                     break;
                 case R.id.navitest:
-                    directionHelper.requestPlaces(null,directionResponceCallback);
-                    Log.d(TAG,"navigate test");
+                    //directionHelper.requestPlaces(null,directionResponceCallback);
+                    rootLine.remove();
+                    rootList.clear();
+                    rootList.add(currentPositionMarker);
+                    Log.d(TAG,"delete PolyLine List");
                     break;
 
             }
@@ -511,6 +520,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
            // }
 
             PolylineOptions po = new PolylineOptions();
+            po.color(Color.BLUE);
             po.addAll(decodedPolyLine);
 
             rootLine = googleMap.addPolyline(po);

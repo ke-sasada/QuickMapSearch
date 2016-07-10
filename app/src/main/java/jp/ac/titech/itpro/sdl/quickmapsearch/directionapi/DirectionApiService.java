@@ -13,6 +13,7 @@ public interface DirectionApiService {
     @Headers("Accept-Language: ja")
     @GET("/maps/api/directions/json")
     Call<DirectionResponce> requestPlaces(@Query("origin") String types,
-                                      @Query("destination") String location,
-                                      @Query("key") String key);
+                                          @Query("destination") String location,
+                                          @Query("waypoints") String waypoints,
+                                          @Query("key") String key);
 }

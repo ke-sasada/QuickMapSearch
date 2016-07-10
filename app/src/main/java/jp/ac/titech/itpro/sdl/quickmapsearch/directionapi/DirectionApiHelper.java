@@ -39,12 +39,21 @@ public class DirectionApiHelper {
 
         DirectionApiService service = retrofit.create(DirectionApiService.class);
 
-        Marker m1 = pointList.get(0);
-        Marker m2 = pointList.get(1);
+        Marker m1 = pointList.getFirst();
+        Marker m2 = pointList.getLast();
+
+        String waypoints = new String();
+
+        for(Marker m:pointList){
+            if(!m.equals(m1) ||!m.equals(m2)){
+                waypoints += String.valueOf(m.getPosition().latitude) + "," + String.valueOf(m.getPosition().longitude) + "|";
+            }
+        }
 
         Call<DirectionResponce> call = service.requestPlaces(
                 String.valueOf(m1.getPosition().latitude) + "," + String.valueOf(m1.getPosition().longitude),
                 String.valueOf(m2.getPosition().latitude) + "," + String.valueOf(m2.getPosition().longitude),
+                waypoints,
                 context.getString(R.string.api_google_maps_key_browser));
         call.enqueue(callback);
 
