@@ -1,4 +1,4 @@
-package jp.ac.titech.itpro.sdl.quickmapsearch;
+package jp.ac.titech.itpro.sdl.quickmapsearch.placeapi;
 
 /**
  * Created by kengo on 16/07/09.

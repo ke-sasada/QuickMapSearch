@@ -1,13 +1,13 @@
-package jp.ac.titech.itpro.sdl.quickmapsearch;
+package jp.ac.titech.itpro.sdl.quickmapsearch.placeapi;
 
 import com.google.android.gms.maps.model.MarkerOptions;
 
 /**
  * Created by kengo on 16/07/09.
  */
-public class Result {
+public class PlaceResult {
 
-    private static final String TAG = Result.class.getSimpleName();
+    private static final String TAG = PlaceResult.class.getSimpleName();
 
     private Geometry geometry;
     private String icon;
@@ -20,8 +20,8 @@ public class Result {
     private String vicinity;
     private MarkerOptions markerOptions;
 
-    public Result(Geometry geometry,String icon,
-                  String id,String  name,String place_id,String rating,String reference,String[] types, String vicinity){
+    public PlaceResult(Geometry geometry, String icon,
+                       String id, String  name, String place_id, String rating, String reference, String[] types, String vicinity){
         this.geometry = geometry;
         this.icon = icon;
         this.id = id;

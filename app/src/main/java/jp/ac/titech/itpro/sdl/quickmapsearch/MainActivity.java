@@ -1,7 +1,6 @@
 package jp.ac.titech.itpro.sdl.quickmapsearch;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -13,18 +12,12 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.GridView;
-import android.widget.ListView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -36,19 +29,19 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.maps.android.PolyUtil;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.lang.reflect.Array;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,15 +49,26 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
+import jp.ac.titech.itpro.sdl.quickmapsearch.directionapi.DirectionApiHelper;
+import jp.ac.titech.itpro.sdl.quickmapsearch.directionapi.DirectionResponce;
+import jp.ac.titech.itpro.sdl.quickmapsearch.directionapi.Leg;
+import jp.ac.titech.itpro.sdl.quickmapsearch.directionapi.RootResult;
+import jp.ac.titech.itpro.sdl.quickmapsearch.directionapi.Step;
+import jp.ac.titech.itpro.sdl.quickmapsearch.placeapi.Location;
+import jp.ac.titech.itpro.sdl.quickmapsearch.placeapi.PlaceApiHelper;
+import jp.ac.titech.itpro.sdl.quickmapsearch.placeapi.PlaceResponce;
+import jp.ac.titech.itpro.sdl.quickmapsearch.placeapi.PlaceResult;
+import jp.ac.titech.itpro.sdl.quickmapsearch.placeapi.ResultList;
 import retrofit2.Call;
 import retrofit2.Callback;
+import retrofit2.Response;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
     private static final String TAG = MainActivity.class.getSimpleName();
 
+    private static final int MAX_WAYPOINTS = 1;
 
     private final static String[] PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -73,7 +77,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private android.location.Location currentLocation;
     private LatLng currentLatLng;
-    PlaceApiHelper helper;
+    PlaceApiHelper placeHelper;
+    DirectionApiHelper directionHelper;
 
     private enum UpdatingState {STOPPED, REQUESTING, STARTED}
 
@@ -89,6 +94,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private Button searchButton;
     private Button spinnerButton;
     private Button debug_FileDeleteButton;
+    private Button debug_naviTestButton;
     private ArrayAdapter<String> spinnerAdapter;
     private ArrayAdapter<String> genreAdapter;
    // private RootAdapter rootAdapter;
@@ -106,9 +112,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private SearchItemList selectedList;
 
-    private Marker selectedMarker = null;
-    private HashMap<String,Result> makerOptionsMap;
+    private HashMap<String,PlaceResult> makerOptionsMap;
     private LinkedList<Marker> rootList;
+    private Marker currentPositionMarker = null;
+
+    private Polyline rootLine = null;
+
+
 
     //private RecyclerView recyclerView;
     //private ArrayList<String> dataList = new ArrayList<String>();
@@ -138,7 +148,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .addApi(LocationServices.API)
                 .build();
 
-        helper = new PlaceApiHelper(this);
+        placeHelper = new PlaceApiHelper(this);
+        directionHelper = new DirectionApiHelper(this);
 
         searchButton = (Button) findViewById(R.id.search_button);
         searchButton.setOnClickListener(onClickListener);
@@ -173,7 +184,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         genreAdapter = new ArrayAdapter<String>(this,
                 android.R.layout.simple_list_item_single_choice);
 
-        makerOptionsMap = new HashMap<String,Result>();
+        makerOptionsMap = new HashMap<String,PlaceResult>();
         rootList = new LinkedList<Marker>();
 
         //recyclerView = (RecyclerView)findViewById(R.id.recyclerview);
@@ -182,6 +193,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         //dataList.add("rootView");
         //rootAdapter = new RootAdapter(this,dataList);
         //recyclerView.setAdapter(rootAdapter);
+
+        debug_naviTestButton = (Button)findViewById(R.id.navitest);
+        debug_naviTestButton.setOnClickListener(onClickListener);
 
         // test data
         if (itemListHashMap == null || itemListHashMap.size() == 0) {
@@ -259,7 +273,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     Toast.makeText(MainActivity.this,"同じ地点は連続して登録出来ません",Toast.LENGTH_SHORT).show();
                 }else{
                     Toast.makeText(MainActivity.this,marker.getTitle() + "が登録されました",Toast.LENGTH_SHORT).show();
+                    rootList.clear();
+                    rootList.addLast(currentPositionMarker);
                     rootList.addLast(marker);
+                    directionHelper.requestPlaces(rootList,directionResponceCallback);
                    // dataList.add(marker.getTitle());
                    // rootAdapter.notifyDataSetChanged();
                 }
@@ -290,7 +307,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         if(!firstAnimated){
             googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16));
             firstAnimated = true;
-            googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置"));
+            currentPositionMarker = googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置"));
         }
     }
 
@@ -443,7 +460,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         count = 0;
                         for (SearchItem item : selectedList.getItemList()) {
                             {
-                                helper.requestPlaces(item.getWord(), currentLatLng, 500, resultCallBack);
+                                placeHelper.requestPlaces(item.getWord(), currentLatLng, 500, placeResponceCallBack);
                             }
                         }
                     }else{
@@ -453,30 +470,77 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 case R.id.spinner_button:
                     createListDialog();
                     break;
+                case R.id.navitest:
+                    directionHelper.requestPlaces(null,directionResponceCallback);
+                    Log.d(TAG,"navigate test");
+                    break;
 
             }
             Log.d(TAG,"onClick_ended");
         }
     };
 
-    private Callback<Response> resultCallBack = new Callback<Response>(){
+    private Callback<DirectionResponce> directionResponceCallback = new Callback<DirectionResponce>(){
+
         @Override
-        public void onResponse(Call<Response> call, retrofit2.Response<Response> response) {
+        public void onResponse(Call<DirectionResponce> call, Response<DirectionResponce> response) {
+            if(response.isSuccessful()){
+                Log.d(TAG,"DirectionResponce");
+            }
+            if(rootLine != null){rootLine.remove();}
+            List<String> encodedPolyLine = new ArrayList<>();
+            List<RootResult> rootResultList = response.body().getResults();
+
+            if(rootResultList != null ){
+                for(RootResult r:rootResultList){
+                    for(Leg l: r.getLegs()){
+                        for(Step s:l.getSteps()){
+                            encodedPolyLine.add(s.getPolyline().getPoints());
+                        }
+                    }
+                }
+            }
+
+            List<LatLng> decodedPolyLine = new ArrayList<LatLng>();
+            for(String s:encodedPolyLine) {
+               decodedPolyLine.addAll(PolyUtil.decode(s));
+            }
+
+           // for(LatLng l:decodedPolyLine){
+           //     Log.d(TAG,String.valueOf(l.latitude) +"," + String .valueOf(l.longitude));
+           // }
+
+            PolylineOptions po = new PolylineOptions();
+            po.addAll(decodedPolyLine);
+
+            rootLine = googleMap.addPolyline(po);
+
+        }
+
+        @Override
+        public void onFailure(Call<DirectionResponce> call, Throwable t) {
+
+        }
+    };
+
+    private Callback<PlaceResponce> placeResponceCallBack = new Callback<PlaceResponce>(){
+        @Override
+        public void onResponse(Call<PlaceResponce> call, retrofit2.Response<PlaceResponce> response) {
             Log.d(TAG,"onResponse");
 
             googleMap.clear();
             MarkerOptions mo = new MarkerOptions().icon(BitmapDescriptorFactory.defaultMarker(selectedList.getItemList().get(count).getColor()));
             ResultList results = new ResultList(response.body().getResults(),mo);
 
-            Iterator itr = results.getResultList().iterator();
+            Iterator itr = results.getPlaceResultList().iterator();
 
             while(itr.hasNext()){
-                Result result = (Result)itr.next();
+                PlaceResult placeResult = (PlaceResult)itr.next();
                 boolean isExist = false;
 
                 for(ResultList rList:allResult){
-                    for(Result r:rList.getResultList()){
-                        if(result.getName().equals(r.getName())) {
+                    for(PlaceResult r:rList.getPlaceResultList()){
+                        if(placeResult.getName().equals(r.getName())) {
                             isExist = true;
                             break;
                         }
@@ -493,8 +557,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             count++;
             if(count == maxItemSize){
                 for(ResultList resultList: allResult){
-                    for(Result r:resultList.getResultList()) {
-                        Log.d(TAG,r.getName());
+                    for(PlaceResult r:resultList.getPlaceResultList()) {
                         Location location = r.getGeometry().getLocation();
                         LatLng latLng = new LatLng(location.getLat(), location.getLng());
                         String name = r.getName();
@@ -530,7 +593,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         }
                     }
                 }
-                googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置"));
+                currentPositionMarker = googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置"));
                 googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16));
 
                 Log.d(TAG,"viewMarker");
@@ -538,7 +601,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Log.d(TAG,"callback ended");
         }
         @Override
-        public void onFailure(Call<Response> call, Throwable t) {
+        public void onFailure(Call<PlaceResponce> call, Throwable t) {
             t.printStackTrace();
         }
     };

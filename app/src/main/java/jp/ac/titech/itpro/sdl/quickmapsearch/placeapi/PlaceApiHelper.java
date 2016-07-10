@@ -1,10 +1,11 @@
-package jp.ac.titech.itpro.sdl.quickmapsearch;
+package jp.ac.titech.itpro.sdl.quickmapsearch.placeapi;
 
 import android.content.Context;
 import android.util.Log;
 
 import com.google.android.gms.maps.model.LatLng;
 
+import jp.ac.titech.itpro.sdl.quickmapsearch.R;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Retrofit;
@@ -22,7 +23,7 @@ public class PlaceApiHelper {
         this.context = context;
     }
 
-    public void requestPlaces(String types, LatLng latLng, int radius, Callback<Response> callback){
+    public void requestPlaces(String types, LatLng latLng, int radius, Callback<PlaceResponce> callback){
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(context.getString(R.string.places_api_url))
                 .addConverterFactory(GsonConverterFactory.create())
@@ -30,7 +31,7 @@ public class PlaceApiHelper {
 
         PlaceApiService service = retrofit.create(PlaceApiService.class);
 
-        Call<Response> call = service.requestPlaces(types,
+        Call<PlaceResponce> call = service.requestPlaces(types,
                 String.valueOf(latLng.latitude) + "," + String.valueOf(latLng.longitude),
                 String.valueOf(radius),
                 "false",
