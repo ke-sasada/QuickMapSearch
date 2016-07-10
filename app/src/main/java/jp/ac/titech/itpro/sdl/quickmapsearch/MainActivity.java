@@ -13,6 +13,8 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -34,6 +36,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
@@ -45,11 +48,13 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.lang.reflect.Array;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -71,6 +76,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     PlaceApiHelper helper;
 
     private enum UpdatingState {STOPPED, REQUESTING, STARTED}
+
     private UpdatingState state = UpdatingState.STOPPED;
     private List<ResultList> allResult;
 
@@ -85,34 +91,41 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private Button debug_FileDeleteButton;
     private ArrayAdapter<String> spinnerAdapter;
     private ArrayAdapter<String> genreAdapter;
+   // private RootAdapter rootAdapter;
 
     private final static int REQCODE_PERMISSIONS = 1111;
     private int count;
     private int maxItemSize;
     private int buttonSelectedIndex = 0;
 
-    private HashMap<String,Bitmap> iconMap;
+    private HashMap<String, Bitmap> iconMap;
 
     private AlertDialog selectListDialog;
     private AlertDialog addListDialog;
-    private LinkedHashMap<String,SearchItemList> itemListHashMap;
+    private LinkedHashMap<String, SearchItemList> itemListHashMap;
 
     private SearchItemList selectedList;
+
+    private Marker selectedMarker = null;
+    private HashMap<String,Result> makerOptionsMap;
+    private LinkedList<Marker> rootList;
+
+    //private RecyclerView recyclerView;
+    //private ArrayList<String> dataList = new ArrayList<String>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        try{
+        try {
             FileInputStream fis = openFileInput("BookMark.dat");
             ObjectInputStream ois = new ObjectInputStream(fis);
             itemListHashMap = (LinkedHashMap<String, SearchItemList>) ois.readObject();
-            Log.d(TAG,"loading 'BookMark.dat' completed");
-        } catch (FileNotFoundException e){
-            Log.d(TAG,"File not Found. Start no file.");
-        }
-        catch (Exception e) {
+            Log.d(TAG, "loading 'BookMark.dat' completed");
+        } catch (FileNotFoundException e) {
+            Log.d(TAG, "File not Found. Start no file.");
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -133,18 +146,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         debug_FileDeleteButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                try{
-                    Log.d(TAG,"delete file");
+                try {
+                    Log.d(TAG, "delete file");
                     deleteFile("BookMark.dat");
-                    Toast.makeText(MainActivity.this,"Debug:Delete 'BookMark.dat' completed",Toast.LENGTH_LONG).show();
-                }catch(Exception e){
+                    Toast.makeText(MainActivity.this, "Debug:Delete 'BookMark.dat' completed", Toast.LENGTH_LONG).show();
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         });
 
         allResult = new ArrayList<ResultList>();
-        currentLatLng = new LatLng(0, 0);
+        currentLatLng = null;
 
         locationRequest = new LocationRequest();
         locationRequest.setInterval(10000);
@@ -160,8 +173,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         genreAdapter = new ArrayAdapter<String>(this,
                 android.R.layout.simple_list_item_single_choice);
 
+        makerOptionsMap = new HashMap<String,Result>();
+        rootList = new LinkedList<Marker>();
+
+        //recyclerView = (RecyclerView)findViewById(R.id.recyclerview);
+        //recyclerView.setHasFixedSize(true);
+        //recyclerView.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
+        //dataList.add("rootView");
+        //rootAdapter = new RootAdapter(this,dataList);
+        //recyclerView.setAdapter(rootAdapter);
+
         // test data
-        if(itemListHashMap == null || itemListHashMap.size() == 0) {
+        if (itemListHashMap == null || itemListHashMap.size() == 0) {
             itemListHashMap = new LinkedHashMap<String, SearchItemList>();
             SearchItem s = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, "toilet", 0.0f);
             ArrayList<SearchItem> sl = new ArrayList<SearchItem>();
@@ -179,14 +202,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     @Override
-    public boolean onCreateOptionsMenu(Menu menu){
-        getMenuInflater().inflate(R.menu.menu,menu);
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu, menu);
         return super.onCreateOptionsMenu(menu);
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item){
-        switch(item.getItemId()){
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
             default:
                 return super.onOptionsItemSelected(item);
         }
@@ -226,14 +249,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
-    public void onMapReady(GoogleMap googleMap) {
-        Log.d(TAG,"onMapReady");
+    public void onMapReady(final GoogleMap googleMap) {
+        Log.d(TAG, "onMapReady");
         this.googleMap = googleMap;
-        googleMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+        googleMap.setOnInfoWindowLongClickListener(new GoogleMap.OnInfoWindowLongClickListener() {
             @Override
-            public boolean onMarkerClick(Marker marker) {
-                marker.showInfoWindow();
-                return true;
+            public void onInfoWindowLongClick(Marker marker) {
+                if(!rootList.isEmpty() && rootList.getLast().equals(marker)){
+                    Toast.makeText(MainActivity.this,"同じ地点は連続して登録出来ません",Toast.LENGTH_SHORT).show();
+                }else{
+                    Toast.makeText(MainActivity.this,marker.getTitle() + "が登録されました",Toast.LENGTH_SHORT).show();
+                    rootList.addLast(marker);
+                   // dataList.add(marker.getTitle());
+                   // rootAdapter.notifyDataSetChanged();
+                }
             }
         });
     }
@@ -251,11 +280,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "onConnectionSuspented");
     }
 
+
+    static boolean firstAnimated = false;
     @Override
     public void onLocationChanged(android.location.Location location) {
         Log.d(TAG, "onLocationChanged: " + location);
         currentLocation = location;
         currentLatLng = new LatLng(currentLocation.getLatitude(),currentLocation.getLongitude());
+        if(!firstAnimated){
+            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16));
+            firstAnimated = true;
+            googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置"));
+        }
     }
 
     @Override
@@ -458,6 +494,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             if(count == maxItemSize){
                 for(ResultList resultList: allResult){
                     for(Result r:resultList.getResultList()) {
+                        Log.d(TAG,r.getName());
                         Location location = r.getGeometry().getLocation();
                         LatLng latLng = new LatLng(location.getLat(), location.getLng());
                         String name = r.getName();
@@ -486,12 +523,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                             Log.d(TAG,"endMainThread");
                         }
                         if(iconMap.containsKey(iconURL)) {
-                            googleMap.addMarker(resultList.getMarkerOptions().position(latLng).title(name)
+                            Marker m = googleMap.addMarker(resultList.getMarkerOptions().position(latLng).title(name)
                                     .icon(BitmapDescriptorFactory.fromBitmap(iconMap.get(iconURL))));
+                            r.setMarkerOptions(resultList.getMarkerOptions());
+                            makerOptionsMap.put(m.getId(),r);
                         }
                     }
                 }
+                googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置"));
                 googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16));
+
                 Log.d(TAG,"viewMarker");
             }
             Log.d(TAG,"callback ended");
