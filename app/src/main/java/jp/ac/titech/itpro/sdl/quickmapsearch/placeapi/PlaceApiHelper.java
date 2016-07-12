@@ -30,13 +30,12 @@ public class PlaceApiHelper {
                 .build();
 
         PlaceApiService service = retrofit.create(PlaceApiService.class);
-
         Call<PlaceResponce> call = service.requestPlaces(types,
                 String.valueOf(latLng.latitude) + "," + String.valueOf(latLng.longitude),
                 String.valueOf(radius),
                 "false",
                 context.getString(R.string.api_google_maps_key_browser));
-        call.enqueue(callback);
+                call.enqueue(callback);
 
         Log.d(TAG,"requestPlaces ended");
     }

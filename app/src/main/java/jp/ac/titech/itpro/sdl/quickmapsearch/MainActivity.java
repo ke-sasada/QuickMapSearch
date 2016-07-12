@@ -6,8 +6,14 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.design.widget.FloatingActionButton;
+import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
@@ -17,8 +23,12 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -45,6 +55,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -68,59 +79,55 @@ import retrofit2.Response;
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
     private static final String TAG = MainActivity.class.getSimpleName();
-
     private static final int MAX_WAYPOINTS = 4;
-
     private final static String[] PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.ACCESS_FINE_LOCATION
     };
 
-    private android.location.Location currentLocation;
-    private LatLng currentLatLng;
-    PlaceApiHelper placeHelper;
-    DirectionApiHelper directionHelper;
-
     private enum UpdatingState {STOPPED, REQUESTING, STARTED}
-
     private UpdatingState state = UpdatingState.STOPPED;
-    private List<ResultList> allResult;
-
 
     private GoogleMap googleMap;
     private GoogleApiClient googleApiClient;
     private MapFragment mapFragment;
     private LocationRequest locationRequest;
+    private android.location.Location currentLocation;
+    private LatLng currentLatLng;
+    private Marker currentPositionMarker = null;
 
-    private Button searchButton;
-    private Button spinnerButton;
+    PlaceApiHelper placeHelper;
+    DirectionApiHelper directionHelper;
+
+    private FloatingActionButton searchButton;
+    private FloatingActionButton spinnerButton;
+    private FloatingActionButton open_RootListButton;
+    private FloatingActionButton close_RootListButton;
     private Button debug_FileDeleteButton;
     private Button debug_naviTestButton;
     private ArrayAdapter<String> spinnerAdapter;
-    private ArrayAdapter<String> genreAdapter;
-   // private RootAdapter rootAdapter;
+    private RootListView rootListView;
+
+    private AlertDialog selectListDialog;
+    private AlertDialog addListDialog;
 
     private final static int REQCODE_PERMISSIONS = 1111;
     private int count;
     private int maxItemSize;
     private int buttonSelectedIndex = 0;
-
-    private HashMap<String, Bitmap> iconMap;
-
-    private AlertDialog selectListDialog;
-    private AlertDialog addListDialog;
-    private LinkedHashMap<String, SearchItemList> itemListHashMap;
+    private Boolean isShowRootList;
 
     private SearchItemList selectedList;
-
-    private HashMap<String,PlaceResult> makerOptionsMap;
-    private LinkedList<Marker> rootList;
-    private Marker currentPositionMarker = null;
-
     private Polyline rootLine = null;
 
 
-
+    private HashMap<String,PlaceResult> makerOptionsMap;
+    private LinkedHashMap<String, SearchItemList> itemListHashMap;
+    private LinkedList<Marker> rootList;
+    private List<ResultList> allResult;
+    private HashMap<String, Bitmap> iconMap;
+    private SampleAdapter rootAdapter;
+   // private RootAdapter rootAdapter;
     //private RecyclerView recyclerView;
     //private ArrayList<String> dataList = new ArrayList<String>();
 
@@ -152,7 +159,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         placeHelper = new PlaceApiHelper(this);
         directionHelper = new DirectionApiHelper(this);
 
-        searchButton = (Button) findViewById(R.id.search_button);
+        locationRequest = new LocationRequest();
+        locationRequest.setInterval(10000);
+        locationRequest.setFastestInterval(5000);
+        locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
+
+        debug_naviTestButton = (Button)findViewById(R.id.navitest);
+        debug_naviTestButton.setOnClickListener(onClickListener);
+        searchButton = (FloatingActionButton) findViewById(R.id.search_button);
         searchButton.setOnClickListener(onClickListener);
         debug_FileDeleteButton = (Button) findViewById((R.id.debug_file_delete));
         debug_FileDeleteButton.setOnClickListener(new View.OnClickListener() {
@@ -167,37 +181,30 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
             }
         });
-
-        allResult = new ArrayList<ResultList>();
-        currentLatLng = null;
-
-        locationRequest = new LocationRequest();
-        locationRequest.setInterval(10000);
-        locationRequest.setFastestInterval(5000);
-        locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
-
-        iconMap = new HashMap<String, Bitmap>();
-
-        spinnerButton = (Button) findViewById(R.id.spinner_button);
+        spinnerButton = (FloatingActionButton) findViewById(R.id.spinner_button);
         spinnerAdapter = new ArrayAdapter<String>(this,
                 android.R.layout.simple_list_item_single_choice);
         spinnerButton.setOnClickListener(onClickListener);
-        genreAdapter = new ArrayAdapter<String>(this,
-                android.R.layout.simple_list_item_single_choice);
+
+        isShowRootList = false;
 
         makerOptionsMap = new HashMap<String,PlaceResult>();
         rootList = new LinkedList<Marker>();
+        iconMap = new HashMap<String, Bitmap>();
+        allResult = new ArrayList<ResultList>();
+        rootListView = (RootListView)findViewById(R.id.root_listview);
 
-        //recyclerView = (RecyclerView)findViewById(R.id.recyclerview);
-        //recyclerView.setHasFixedSize(true);
-        //recyclerView.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
-        //dataList.add("rootView");
-        //rootAdapter = new RootAdapter(this,dataList);
-        //recyclerView.setAdapter(rootAdapter);
+        open_RootListButton = (FloatingActionButton)findViewById(R.id.open_rootbutton);
+        open_RootListButton.setOnClickListener(onClickListener);
+        close_RootListButton = (FloatingActionButton)findViewById(R.id.close_rootbutton);
+        close_RootListButton.setOnClickListener(onClickListener);
+        rootAdapter = new SampleAdapter();
+        rootListView.setOnItemClickListener(rootListView);
+        rootListView.setDragListener(new DragListener());
+        rootListView.setSortable(true);
+        rootListView.setAdapter(rootAdapter);
 
-        debug_naviTestButton = (Button)findViewById(R.id.navitest);
-        debug_naviTestButton.setOnClickListener(onClickListener);
-
+        
         // test data
         if (itemListHashMap == null || itemListHashMap.size() == 0) {
             itemListHashMap = new LinkedHashMap<String, SearchItemList>();
@@ -213,12 +220,49 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             itemListHashMap.put(l.getName(), l);
             //
         }
+
+        currentLatLng = new LatLng(35.681368,139.766076);
+    }
+
+    class SampleAdapter extends BaseAdapter {
+        @Override
+        public int getCount() {
+            return rootList.size();
+        }
+
+        @Override
+        public String getItem(int position) {
+            return rootList.get(position).getTitle();
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        public void removeItem(int position){
+            rootList.remove(position);
+            startDirectionRequest();
+            rootAdapter.notifyDataSetChanged();
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            if (convertView == null) {
+                convertView = getLayoutInflater().inflate(
+                        android.R.layout.simple_list_item_1, null);
+            }
+            final TextView view = (TextView) convertView;
+            view.setText(rootList.get(position).getTitle());
+            view.setVisibility(position == draggingPosition ? View.INVISIBLE
+                    : View.VISIBLE);
+            return convertView;
+        }
     }
 
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu, menu);
         return super.onCreateOptionsMenu(menu);
     }
 
@@ -245,6 +289,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             startLocationUpdate(true);
         else
             state = UpdatingState.REQUESTING;
+
     }
 
     @Override
@@ -263,6 +308,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         super.onStop();
     }
 
+    public void startDirectionRequest(){
+        directionHelper.requestPlaces(rootList,directionResponceCallback);
+    }
+
     @Override
     public void onMapReady(final GoogleMap googleMap) {
         Log.d(TAG, "onMapReady");
@@ -275,11 +324,19 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     Toast.makeText(MainActivity.this,"同じ地点は連続して登録出来ません",Toast.LENGTH_SHORT).show();
                 }else{
                     Toast.makeText(MainActivity.this,marker.getTitle() + "が登録されました",Toast.LENGTH_SHORT).show();
-                    rootList.addLast(marker);
-                    directionHelper.requestPlaces(rootList,directionResponceCallback);
-                   // dataList.add(marker.getTitle());
-                   // rootAdapter.notifyDataSetChanged();
+                    rootList.set(rootList.size()-1,marker);
+                    rootList.add(currentPositionMarker);
+                    startDirectionRequest();
+                    rootAdapter.notifyDataSetChanged();
                 }
+            }
+        });
+        googleMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+            @Override
+            public boolean onMarkerClick(Marker marker) {
+                final RelativeLayout layout = (RelativeLayout) findViewById(R.id.main_root);
+                Snackbar.make(layout,marker.getTitle(),Snackbar.LENGTH_INDEFINITE).show();
+                return false;
             }
         });
     }
@@ -307,8 +364,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         if(!firstAnimated){
             googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16));
             firstAnimated = true;
-            currentPositionMarker = googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置"));
+            currentPositionMarker = googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置").flat(true));
             rootList.add(currentPositionMarker);
+            rootList.add(currentPositionMarker);
+        }else {
+            rootList.set(0, currentPositionMarker);
+            rootList.set(rootList.size() - 1, currentPositionMarker);
         }
     }
 
@@ -392,7 +453,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 @Override
                 public void onClick(View view) {
                     selectedList = itemListHashMap.get(spinnerAdapter.getItem(buttonSelectedIndex));
-                    spinnerButton.setText(selectedList.getName());
+                    //spinnerButton.setText(selectedList.getName());
                     try{
                         FileOutputStream fos = openFileOutput("BookMark.dat",MODE_PRIVATE);
                         ObjectOutputStream oos = new ObjectOutputStream(fos);
@@ -457,11 +518,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 case R.id.search_button:
                     allResult.clear();
                     if(selectedList != null) {
-                        if(rootLine != null) {
-                            rootLine.remove();
-                            rootList.clear();
-                            rootList.add(currentPositionMarker);
-                        }
                         maxItemSize = selectedList.getItemList().size();
                         count = 0;
                         for (SearchItem item : selectedList.getItemList()) {
@@ -483,6 +539,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     rootList.add(currentPositionMarker);
                     Log.d(TAG,"delete PolyLine List");
                     break;
+                case R.id.open_rootbutton:
+                    if(!isShowRootList) isShowRootList = true;
+                    open_RootListButton.setVisibility(View.GONE);
+                    close_RootListButton.setVisibility(View.VISIBLE);
+                    rootListView.setVisibility(View.VISIBLE);
+                    break;
+                case R.id.close_rootbutton:
+                    if(isShowRootList) isShowRootList = false;
+                    open_RootListButton.setVisibility(View.VISIBLE);
+                    close_RootListButton.setVisibility(View.GONE);
+                    rootListView.setVisibility(View.GONE);
+
 
             }
             Log.d(TAG,"onClick_ended");
@@ -514,10 +582,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             for(String s:encodedPolyLine) {
                decodedPolyLine.addAll(PolyUtil.decode(s));
             }
-
-           // for(LatLng l:decodedPolyLine){
-           //     Log.d(TAG,String.valueOf(l.latitude) +"," + String .valueOf(l.longitude));
-           // }
 
             PolylineOptions po = new PolylineOptions();
             po.color(Color.BLUE);
@@ -603,9 +667,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         }
                     }
                 }
-                currentPositionMarker = googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置"));
+                currentPositionMarker = googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置").flat(true));
                 googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16));
-
+                startDirectionRequest();
                 Log.d(TAG,"viewMarker");
             }
             Log.d(TAG,"callback ended");
@@ -615,6 +679,56 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             t.printStackTrace();
         }
     };
+
+    private int draggingPosition;
+
+    class DragListener extends RootListView.SimpleDragListener {
+        @Override
+        public int onStartDrag(int position) {
+            draggingPosition = position;
+            rootListView.invalidateViews();
+            return position;
+        }
+
+        @Override
+        public int onDuringDrag(int positionFrom, int positionTo) {
+            if (positionFrom < 0 || positionTo < 0
+                    || positionFrom == positionTo) {
+                return positionFrom;
+            }
+            int i;
+            if (positionFrom < positionTo) {
+                final int min = positionFrom;
+                final int max = positionTo;
+                final String data = rootList.get(min).getTitle();
+                i = min;
+                while (i < max) {
+                    rootList.get(i).setTitle(rootList.get(++i).getTitle());
+                }
+                rootList.get(max).setTitle(data);
+            } else if (positionFrom > positionTo) {
+                final int min = positionTo;
+                final int max = positionFrom;
+                final String data = rootList.get(max).getTitle();
+                i = max;
+                while (i > min) {
+                    rootList.get(i).setTitle(rootList.get(--i).getTitle());
+                }
+                rootList.get(min).setTitle(data);
+            }
+            draggingPosition = positionTo;
+            rootListView.invalidateViews();
+            return positionTo;
+        }
+
+        @Override
+        public boolean onStopDrag(int positionFrom, int positionTo) {
+            draggingPosition = -1;
+            rootListView.invalidateViews();
+            startDirectionRequest();
+            return super.onStopDrag(positionFrom, positionTo);
+        }
+    }
 
 }
 
