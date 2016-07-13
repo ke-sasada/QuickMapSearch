@@ -9,6 +9,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import java.io.Serializable;
 
 /**
+ * 検索アイテムを表現するクラス
  * Created by kengo on 16/07/09.
  */
 public class SearchItem implements Serializable{

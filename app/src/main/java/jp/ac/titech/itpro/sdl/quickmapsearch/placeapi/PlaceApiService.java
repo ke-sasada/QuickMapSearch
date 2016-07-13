@@ -6,6 +6,7 @@ import retrofit2.http.Headers;
 import retrofit2.http.Query;
 
 /**
+ * PlaceAPI利用のためのインターフェース
  * Created by kengo on 16/07/09.
  */
 public interface PlaceApiService {

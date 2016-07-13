@@ -4,10 +4,8 @@ import android.Manifest;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.hardware.input.InputManager;
+import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
@@ -16,7 +14,6 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -24,7 +21,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.inputmethod.InputMethod;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
@@ -58,7 +54,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -84,7 +79,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
     private static final String TAG = MainActivity.class.getSimpleName();
     private static final int MAX_SEARCHWORD = 3;
-
     private final static String[] PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.ACCESS_FINE_LOCATION
@@ -101,7 +95,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private android.location.Location currentLocation;
     private LatLng currentLatLng;
     private Marker currentPositionMarker = null;
-
     PlaceApiHelper placeHelper;
     DirectionApiHelper directionHelper;
 
@@ -112,24 +105,25 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private FloatingActionButton debug_naviTestButton;
     private FloatingActionButton startNaviButton;
     private FloatingActionButton endNaviButton;
-    private BookMarkAdapter bookmarkAdapter;
-    private RootListView rootListView;
+
     private BookmarkListView bookmarkListView;
     private AddBookmarkListView addListView;
+    private RootListView rootListView;
+    private View addListDialogView;
+
+    private BookMarkAdapter bookmarkAdapter;
     private AddListAdapter addListAdapter;
+
     private AlertDialog bookmarkListDialog;
     private AlertDialog addListDialog;
-    private View addListDialogView;
 
     private final static int REQCODE_PERMISSIONS = 1111;
     private int count;
     private int maxItemSize;
-    private int buttonSelectedIndex = 0;
     private Boolean isShowRootList;
 
     private SearchItemList selectedList;
     private Polyline rootLine = null;
-
 
     private HashMap<String,PlaceResult> makerOptionsMap;
     private LinkedHashMap<String, SearchItemList> itemListHashMap;
@@ -137,7 +131,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private List<ResultList> allResult;
     private HashMap<String,String> iconMap;
     private SampleAdapter rootAdapter;
+    private int draggingPosition;
 
+
+    static boolean firstAnimated = false;
+    boolean isNaviStarted = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -189,69 +187,37 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         debug_naviTestButton.setOnClickListener(onClickListener);
         searchButton = (FloatingActionButton) findViewById(R.id.search_button);
         searchButton.setOnClickListener(onClickListener);
-
         spinnerButton = (FloatingActionButton) findViewById(R.id.spinner_button);
         spinnerButton.setOnClickListener(onClickListener);
-
-        isShowRootList = false;
-
-        makerOptionsMap = new HashMap<String,PlaceResult>();
-        rootList = new LinkedList<Marker>();
-        allResult = new ArrayList<ResultList>();
-        rootListView = (RootListView)findViewById(R.id.root_listview);
         open_RootListButton = (FloatingActionButton)findViewById(R.id.open_rootbutton);
         open_RootListButton.setOnClickListener(onClickListener);
         close_RootListButton = (FloatingActionButton)findViewById(R.id.close_rootbutton);
         close_RootListButton.setOnClickListener(onClickListener);
+        startNaviButton = (FloatingActionButton)findViewById(R.id.start_navi);
+        endNaviButton = (FloatingActionButton)findViewById(R.id.end_navi);
+        startNaviButton.setOnClickListener(onClickListener);
+        endNaviButton.setOnClickListener(onClickListener);
+
+        makerOptionsMap = new HashMap<String,PlaceResult>();
+        rootList = new LinkedList<Marker>();
+        allResult = new ArrayList<ResultList>();
+        iconMap = new HashMap<String, String>();
+
+        rootListView = (RootListView)findViewById(R.id.root_listview);
+
         rootAdapter = new SampleAdapter();
         rootListView.setOnItemClickListener(rootListView);
         rootListView.setDragListener(new DragListener());
         rootListView.setSortable(true);
         rootListView.setAdapter(rootAdapter);
 
-
-        iconMap = new HashMap<String, String>();
         String[] genre = getResources().getStringArray(R.array.genre_list);
         String[] icon = getResources().getStringArray(R.array.genre_pic);
         for(int i = 0; i < genre.length;i++){
             iconMap.put(genre[i],icon[i]);
         }
-        
-        // test data
-        if (itemListHashMap == null || itemListHashMap.size() == 0) {
-            itemListHashMap = new LinkedHashMap<String, SearchItemList>();
-            SearchItem s = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, "toilet", 0.0f);
-            ArrayList<SearchItem> sl = new ArrayList<SearchItem>();
-            sl.add(s);
-            SearchItemList l = new SearchItemList(0, "Test", sl);
-            itemListHashMap.put(l.getName(), l);
-            s = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, "school", 0.0f);
-            sl = new ArrayList<SearchItem>();
-            sl.add(s);
-            l = new SearchItemList(1, "Test2", sl);
-            itemListHashMap.put(l.getName(), l);
-            //
-        }
 
-        startNaviButton = (FloatingActionButton)findViewById(R.id.start_navi);
-        endNaviButton = (FloatingActionButton)findViewById(R.id.end_navi);
-        startNaviButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                startNaviButton.setVisibility(View.GONE);
-                endNaviButton.setVisibility(View.VISIBLE);
-                isNaviStarted = false;
-            }
-        });
-        endNaviButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                startNaviButton.setVisibility(View.VISIBLE);
-                endNaviButton.setVisibility(View.GONE);
-                isNaviStarted = false;
-            }
-        });
-
+        isShowRootList = false;
         currentLatLng = new LatLng(35.681368,139.766076);
     }
 
@@ -288,20 +254,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             view.setVisibility(position == draggingPosition ? View.INVISIBLE
                     : View.VISIBLE);
             return convertView;
-        }
-    }
-
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        return super.onCreateOptionsMenu(menu);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            default:
-                return super.onOptionsItemSelected(item);
         }
     }
 
@@ -343,6 +295,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         directionHelper.requestPlaces(rootList,directionResponceCallback);
     }
 
+    /**
+     * マップ利用の準備が終わった後に行う動作
+     * @param googleMap
+     */
     @Override
     public void onMapReady(final GoogleMap googleMap) {
         Log.d(TAG, "onMapReady");
@@ -385,9 +341,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "onConnectionSuspented");
     }
 
-
-    static boolean firstAnimated = false;
-    boolean isNaviStarted = false;
+    /**
+     * 現在地変更の際の動作
+     * @param location
+     */
     @Override
     public void onLocationChanged(android.location.Location location) {
         Log.d(TAG, "onLocationChanged: " + location);
@@ -447,8 +404,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         state = UpdatingState.STOPPED;
     }
 
+    /**
+     * MainActivity内の主なボタンに対するリスナー
+     *
+     */
     private View.OnClickListener onClickListener = new View.OnClickListener() {
 
+        /**
+         * ブックマーク表示ダイアログの生成
+         */
         private void createListDialog(){
             if(bookmarkListDialog == null) {
                 AlertDialog.Builder builder = new AlertDialog.Builder(
@@ -498,6 +462,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         }
 
+        /**
+         * ブックマーク生成ダイアログの作成
+         */
         private void createAddListDialog() {
             EditText title;
             final String[] genreList = getResources().getStringArray(R.array.genre_list);
@@ -589,6 +556,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         }
 
+        /**
+         * ボタン動作の定義
+         * @param view
+         */
         @Override
         public void onClick(View view) {
             Log.d(TAG, "onClick");
@@ -633,13 +604,25 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     open_RootListButton.setVisibility(View.VISIBLE);
                     close_RootListButton.setVisibility(View.GONE);
                     rootListView.setVisibility(View.GONE);
-
+                    break;
+                case R.id.start_navi:
+                    startNaviButton.setVisibility(View.GONE);
+                    endNaviButton.setVisibility(View.VISIBLE);
+                    isNaviStarted = false;
+                    break;
+                case R.id.end_navi:
+                    startNaviButton.setVisibility(View.VISIBLE);
+                    endNaviButton.setVisibility(View.GONE);
+                    isNaviStarted = true;
 
             }
             Log.d(TAG,"onClick_ended");
         }
     };
 
+    /**
+     * directionAPIの結果を解析、表示
+     */
     private Callback<DirectionResponce> directionResponceCallback = new Callback<DirectionResponce>(){
 
         @Override
@@ -665,21 +648,21 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             for(String s:encodedPolyLine) {
                decodedPolyLine.addAll(PolyUtil.decode(s));
             }
-
             PolylineOptions po = new PolylineOptions();
             po.color(Color.BLUE);
             po.addAll(decodedPolyLine);
-
             rootLine = googleMap.addPolyline(po);
 
         }
-
         @Override
         public void onFailure(Call<DirectionResponce> call, Throwable t) {
 
         }
     };
 
+    /**
+     * placeAPIの結果を解析、表示
+     */
     private Callback<PlaceResponce> placeResponceCallBack = new Callback<PlaceResponce>(){
         @Override
         public void onResponse(Call<PlaceResponce> call, retrofit2.Response<PlaceResponce> response) {
@@ -687,13 +670,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             googleMap.clear();
             MarkerOptions mo = new MarkerOptions().icon(BitmapDescriptorFactory.defaultMarker(selectedList.getItemList().get(count).getColor()));
             ResultList results = new ResultList(response.body().getResults(),mo);
-
             Iterator itr = results.getPlaceResultList().iterator();
-
             while(itr.hasNext()){
                 PlaceResult placeResult = (PlaceResult)itr.next();
                 boolean isExist = false;
-
                 for(ResultList rList:allResult){
                     for(PlaceResult r:rList.getPlaceResultList()){
                         if(placeResult.getName().equals(r.getName())) {
@@ -722,7 +702,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         if(iconMap.containsKey(r.getSearchWord())) {
                             String iconName = iconMap.get(r.getSearchWord());
                             BitmapDescriptor icon = BitmapDescriptorFactory.fromResource(getResources().getIdentifier(iconName, "drawable", "jp.ac.titech.itpro.sdl.quickmapsearch"));
-
                             m = googleMap.addMarker(resultList.getMarkerOptions().position(latLng).title(name)
                                     .icon(icon));
                         }else{
@@ -731,7 +710,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         }
                         r.setMarkerOptions(resultList.getMarkerOptions());
                         makerOptionsMap.put(m.getId(),r);
-
                     }
                 }
                 currentPositionMarker = googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置").flat(true));
@@ -747,8 +725,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     };
 
-    private int draggingPosition;
-
+    /**
+     * ルートアイテムのドラッグ処理のためのリスナー
+     */
     class DragListener extends RootListView.SimpleDragListener {
         @Override
         public int onStartDrag(int position) {
@@ -797,6 +776,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
+    /**
+     * ブックマーク表示のadapter
+     */
     class BookMarkAdapter extends ArrayAdapter<String> {
 
         private LayoutInflater inflater;
@@ -835,6 +817,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
+    /**
+     * ブックマーク追加のadapter
+     */
     class AddListAdapter extends ArrayAdapter<String> {
 
         private LayoutInflater inflater;
@@ -861,7 +846,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-
+    /**
+     * ブックマークの削除処理
+     * @param v
+     */
     public void removeItem(View v){
         if(itemListHashMap.get(String.valueOf(v.getTag())).equals(selectedList)){
             selectedList = null;

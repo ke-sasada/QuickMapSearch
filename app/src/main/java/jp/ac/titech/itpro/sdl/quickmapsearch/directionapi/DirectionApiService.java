@@ -7,6 +7,7 @@ import retrofit2.http.Headers;
 import retrofit2.http.Query;
 
 /**
+ * DirectionAPI利用のためのインターフェース
  * Created by kengo on 16/07/10.
  */
 public interface DirectionApiService {

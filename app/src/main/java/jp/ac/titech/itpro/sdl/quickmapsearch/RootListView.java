@@ -16,6 +16,7 @@ import android.widget.ImageView;
 import android.widget.ListView;
 
 /**
+ * ルートアイテムの表示ビュー 参考サイト有り
  * Created by kengo on 16/07/12.
  */
 public class RootListView extends ListView implements AdapterView.OnItemLongClickListener,AdapterView.OnItemClickListener {

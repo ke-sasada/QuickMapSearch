@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 /**
+ * ブックマーク追加のダイアログ用ビュー
  * Created by kengo on 16/07/13.
  */
 public class AddBookmarkListView extends ListView implements AdapterView.OnItemClickListener{
@@ -19,15 +20,12 @@ public class AddBookmarkListView extends ListView implements AdapterView.OnItemC
     private ArrayList<Integer> checkedNo = new ArrayList<Integer>();
 
     public ArrayList<Integer> getCheckedNo(){return checkedNo;}
-
     public AddBookmarkListView(Context context) {
         super(context);
     }
-
     public AddBookmarkListView(Context context, AttributeSet attrs){
         super(context,attrs);
     }
-
     public AddBookmarkListView(Context context, AttributeSet attrs, int defStyleAttr){
         super(context,attrs,defStyleAttr);
     }
@@ -35,6 +33,7 @@ public class AddBookmarkListView extends ListView implements AdapterView.OnItemC
     public void clearChecked(){
         checkedNo.clear();
     }
+
 
      @Override
      public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {

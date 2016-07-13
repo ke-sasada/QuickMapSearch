@@ -9,7 +9,6 @@ import java.util.List;
  * Created by kengo on 16/07/09.
  */
 public class ResultList {
-
     private List<PlaceResult> placeResultList;
     private MarkerOptions markerOptions;
 
@@ -18,7 +17,6 @@ public class ResultList {
         this.placeResultList.addAll(placeResults);
         this.markerOptions = markerOptions;
     }
-
     public List<PlaceResult> getPlaceResultList(){return placeResultList;}
     public MarkerOptions getMarkerOptions(){return  markerOptions;}
 }

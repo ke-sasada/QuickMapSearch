@@ -8,6 +8,7 @@ import android.widget.CheckBox;
 import android.widget.ListView;
 
 /**
+ * ブックマーク表示のためのビュー
  * Created by kengo on 16/07/13.
  */
 public class BookmarkListView extends ListView implements AdapterView.OnItemClickListener{
@@ -15,15 +16,12 @@ public class BookmarkListView extends ListView implements AdapterView.OnItemClic
     private View selectView;
     private int selectNo;
 
-    public int getSelectNo(){return selectNo;}
     public void setSelectView(View v){this.selectView = v;}
     public View getSelectView(){return selectView;}
     public void setSelectNo(int No){selectNo = No;}
-
     public BookmarkListView(Context context) {
         super(context);
     }
-
 
     @Override
     public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {

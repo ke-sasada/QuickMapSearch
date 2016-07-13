@@ -5,17 +5,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * 一つのブックマークを表すクラス
  * Created by kengo on 16/07/09.
  */
 public class SearchItemList implements Serializable{
 
     private static final String TAG = SearchItemList.class.getSimpleName();
     private static final long serialVersionUID = -4957644179490359233L;
-
     int id;
-
     List<SearchItem> itemList;
-
     private String name;
 
     public SearchItemList(int id,String name,List<SearchItem> itemList){
