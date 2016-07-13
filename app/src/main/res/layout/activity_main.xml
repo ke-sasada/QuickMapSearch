@@ -77,14 +77,20 @@
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true" />
 
-    <Button
+    <android.support.design.widget.FloatingActionButton
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="DeleteNavi"
-        android:id="@+id/navitest"
+        android:id="@+id/delete_navigation"
         android:layout_centerVertical="true"
+        android:layout_alignParentEnd="true"
+        app:fabSize="normal"
+        app:borderWidth="0dp"
+        app:backgroundTint="#FF0000"
+        android:src="@drawable/ic_trending_up_white"
         android:layout_alignParentRight="true"
-        android:layout_alignParentEnd="true" />
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="100dp"
+        android:layout_marginRight="20dp" />
 
     <LinearLayout
         android:layout_width="300dp"

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal" android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:descendantFocusability="blocksDescendants"
+    >
+
+    <CheckBox
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginRight="15dp"
+        android:layout_marginLeft="10dp"
+        android:clickable="false"
+        android:focusableInTouchMode="false"
+        android:id="@+id/bookmark_checkbox"
+        />
+
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:src="@android:drawable/ic_btn_speak_now"
+        />
+
+    <TextView
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_gravity="center_vertical"
+        android:paddingLeft="15dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:text="title"
+        android:textSize="28sp"
+        android:clickable="false"
+        android:focusableInTouchMode="false"
+        android:id="@+id/bookmark_text"/>
+
+    <ImageButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="left"
+        android:layout_marginRight="20dp"
+        android:clickable="false"
+        android:focusableInTouchMode="false"
+        android:id = "@+id/bookmark_delete"
+        android:src = "@android:drawable/ic_delete"/>
+
+
+
+</LinearLayout>

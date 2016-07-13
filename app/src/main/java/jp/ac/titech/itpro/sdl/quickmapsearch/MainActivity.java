@@ -6,10 +6,6 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
@@ -24,7 +20,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.RelativeLayout;
@@ -55,7 +50,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -104,11 +98,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private FloatingActionButton open_RootListButton;
     private FloatingActionButton close_RootListButton;
     private Button debug_FileDeleteButton;
-    private Button debug_naviTestButton;
-    private ArrayAdapter<String> spinnerAdapter;
+    private FloatingActionButton debug_naviTestButton;
+    private BookMarkAdapter bookmarkAdapter;
     private RootListView rootListView;
-
-    private AlertDialog selectListDialog;
+    private BookMarkView bookmarkListView;
+    private AlertDialog bookmarkListDialog;
     private AlertDialog addListDialog;
 
     private final static int REQCODE_PERMISSIONS = 1111;
@@ -127,19 +121,29 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private List<ResultList> allResult;
     private HashMap<String, Bitmap> iconMap;
     private SampleAdapter rootAdapter;
-   // private RootAdapter rootAdapter;
-    //private RecyclerView recyclerView;
-    //private ArrayList<String> dataList = new ArrayList<String>();
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        bookmarkAdapter = new BookMarkAdapter(this,R.layout.bookmark_itemlayout,R.id.bookmark_text);
+        bookmarkListView = new BookMarkView(this);
+
         try {
             FileInputStream fis = openFileInput("BookMark.dat");
             ObjectInputStream ois = new ObjectInputStream(fis);
             itemListHashMap = (LinkedHashMap<String, SearchItemList>) ois.readObject();
+            for(SearchItemList list:itemListHashMap.values()) {
+                bookmarkAdapter.add(list.getName());
+            }
+            if(itemListHashMap.size() > 0){
+                bookmarkListView.setSelectNo(0);
+                bookmarkListView.setOnItemClickListener(bookmarkListView);
+            }
+            bookmarkListView.setAdapter(bookmarkAdapter);
+
             Log.d(TAG, "loading 'BookMark.dat' completed");
         } catch (FileNotFoundException e) {
             Log.d(TAG, "File not Found. Start no file.");
@@ -164,7 +168,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         locationRequest.setFastestInterval(5000);
         locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
 
-        debug_naviTestButton = (Button)findViewById(R.id.navitest);
+        debug_naviTestButton = (FloatingActionButton) findViewById(R.id.delete_navigation);
         debug_naviTestButton.setOnClickListener(onClickListener);
         searchButton = (FloatingActionButton) findViewById(R.id.search_button);
         searchButton.setOnClickListener(onClickListener);
@@ -182,8 +186,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         });
         spinnerButton = (FloatingActionButton) findViewById(R.id.spinner_button);
-        spinnerAdapter = new ArrayAdapter<String>(this,
-                android.R.layout.simple_list_item_single_choice);
         spinnerButton.setOnClickListener(onClickListener);
 
         isShowRootList = false;
@@ -193,7 +195,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         iconMap = new HashMap<String, Bitmap>();
         allResult = new ArrayList<ResultList>();
         rootListView = (RootListView)findViewById(R.id.root_listview);
-
         open_RootListButton = (FloatingActionButton)findViewById(R.id.open_rootbutton);
         open_RootListButton.setOnClickListener(onClickListener);
         close_RootListButton = (FloatingActionButton)findViewById(R.id.close_rootbutton);
@@ -203,6 +204,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         rootListView.setDragListener(new DragListener());
         rootListView.setSortable(true);
         rootListView.setAdapter(rootAdapter);
+
 
         
         // test data
@@ -415,57 +417,49 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private View.OnClickListener onClickListener = new View.OnClickListener() {
 
         private void createListDialog(){
+            if(bookmarkListDialog == null) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(
+                        MainActivity.this);
+                builder.setTitle("ブックマーク");
 
-            AlertDialog.Builder builder = new AlertDialog.Builder(
-                    MainActivity.this);
-            builder.setTitle("ブックマーク");
+                builder.setPositiveButton("OK", null);
+                builder.setNeutralButton("+", null);
+                builder.setView(bookmarkListView);
+                bookmarkListDialog = builder.create();
 
-            builder.setPositiveButton("OK",null);
-            builder.setNeutralButton("+",null);
-            spinnerAdapter.clear();
-            for(SearchItemList list:itemListHashMap.values()) {
-                spinnerAdapter.add(list.getName());
+                bookmarkListDialog.show();
+                Button addButton = bookmarkListDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+                addButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        if (itemListHashMap.size() < 10) {
+                            createAddListDialog();
+                        } else {
+                            Toast.makeText(getApplicationContext(), "Up to 10", Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
+                Button okButton = bookmarkListDialog.getButton(DialogInterface.BUTTON_POSITIVE);
+                okButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        selectedList = itemListHashMap.get(bookmarkAdapter.getItem(bookmarkListView.getSelectNo()));
+                        //spinnerButton.setText(selectedList.getName());
+                        try {
+                            FileOutputStream fos = openFileOutput("BookMark.dat", MODE_PRIVATE);
+                            ObjectOutputStream oos = new ObjectOutputStream(fos);
+                            oos.writeObject(itemListHashMap);
+                            oos.close();
+                            Log.d(TAG, "saving 'BookMark.dat' completed");
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                        bookmarkListDialog.dismiss();
+                    }
+                });
+            }else{
+                bookmarkListDialog.show();
             }
-
-            builder.setSingleChoiceItems(spinnerAdapter, buttonSelectedIndex, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i) {
-                    buttonSelectedIndex = i;
-                }
-            });
-
-            selectListDialog = builder.create();
-
-            selectListDialog.show();
-            Button addButton = selectListDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
-            addButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    if(itemListHashMap.size() < 10) {
-                        createAddListDialog();
-                    }else{
-                        Toast.makeText(getApplicationContext(),"Up to 10",Toast.LENGTH_LONG).show();
-                    }
-                }
-            });
-            Button okButton = selectListDialog.getButton(DialogInterface.BUTTON_POSITIVE);
-            okButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    selectedList = itemListHashMap.get(spinnerAdapter.getItem(buttonSelectedIndex));
-                    //spinnerButton.setText(selectedList.getName());
-                    try{
-                        FileOutputStream fos = openFileOutput("BookMark.dat",MODE_PRIVATE);
-                        ObjectOutputStream oos = new ObjectOutputStream(fos);
-                        oos.writeObject(itemListHashMap);
-                        oos.close();
-                        Log.d(TAG,"saving 'BookMark.dat' completed");
-                    }catch (Exception e){
-                        e.printStackTrace();
-                    }
-                    selectListDialog.dismiss();
-                }
-            });
         }
 
         private void createAddListDialog() {
@@ -502,7 +496,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         Toast.makeText(MainActivity.this,"no selected",Toast.LENGTH_LONG).show();
                     }else {
                         itemListHashMap.put(list.getName(), list);
-                        spinnerAdapter.add(list.getName());
+                        bookmarkAdapter.add(list.getName());
                         addListDialog.dismiss();
                         Log.d(TAG, "endaddButtonClick");
                     }
@@ -532,12 +526,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 case R.id.spinner_button:
                     createListDialog();
                     break;
-                case R.id.navitest:
-                    //directionHelper.requestPlaces(null,directionResponceCallback);
-                    rootLine.remove();
-                    rootList.clear();
-                    rootList.add(currentPositionMarker);
-                    Log.d(TAG,"delete PolyLine List");
+                case R.id.delete_navigation:
+                    if(rootLine != null) {
+                        rootLine.remove();
+                        rootList.clear();
+                        rootList.add(currentPositionMarker);
+                        rootList.add(currentPositionMarker);
+                        Log.d(TAG, "delete PolyLine List");
+                    }
                     break;
                 case R.id.open_rootbutton:
                     if(!isShowRootList) isShowRootList = true;
