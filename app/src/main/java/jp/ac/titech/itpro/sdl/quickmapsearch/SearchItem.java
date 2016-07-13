@@ -31,5 +31,6 @@ public class SearchItem implements Serializable{
     public String getWord(){return word;}
     public void setWord(String word){this.word = word; }
     public float getColor(){return color;}
+    public SEARCH_TYPE getSearch_type(){return search_type;}
 
 }

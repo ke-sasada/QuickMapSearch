@@ -36,17 +36,4 @@
         android:focusableInTouchMode="false"
         android:id="@+id/bookmark_text"/>
 
-    <ImageButton
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="left"
-        android:layout_marginRight="20dp"
-        android:clickable="false"
-        android:focusableInTouchMode="false"
-        android:onClick="removeItem"
-        android:id = "@+id/bookmark_delete"
-        android:src = "@android:drawable/ic_delete"/>
-
-
-
 </LinearLayout>

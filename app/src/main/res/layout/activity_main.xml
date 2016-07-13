@@ -68,15 +68,6 @@
         android:layout_marginRight="100dp" />
 
 
-
-    <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Debug File delete"
-        android:id="@+id/debug_file_delete"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true" />
-
     <android.support.design.widget.FloatingActionButton
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -87,6 +78,37 @@
         app:borderWidth="0dp"
         app:backgroundTint="#FF0000"
         android:src="@drawable/ic_trending_up_white"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="180dp"
+        android:layout_marginRight="20dp" />
+
+    <android.support.design.widget.FloatingActionButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/start_navi"
+        android:layout_centerVertical="true"
+        android:layout_alignParentEnd="true"
+        app:fabSize="normal"
+        app:borderWidth="0dp"
+        app:backgroundTint="#00BFFF"
+        android:src="@drawable/ic_navigation_white"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="100dp"
+        android:layout_marginRight="20dp"
+        android:visibility="gone"/>
+
+    <android.support.design.widget.FloatingActionButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/end_navi"
+        android:layout_centerVertical="true"
+        android:layout_alignParentEnd="true"
+        app:fabSize="normal"
+        app:borderWidth="0dp"
+        app:backgroundTint="#EEEEEE"
+        android:src="@drawable/ic_navigation_black"
         android:layout_alignParentRight="true"
         android:layout_alignParentBottom="true"
         android:layout_marginBottom="100dp"

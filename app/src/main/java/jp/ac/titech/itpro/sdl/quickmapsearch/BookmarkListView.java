@@ -10,8 +10,8 @@ import android.widget.ListView;
 /**
  * Created by kengo on 16/07/13.
  */
-public class BookMarkView extends ListView implements AdapterView.OnItemClickListener{
-    private static final String TAG = BookMarkView.class.getSimpleName();
+public class BookmarkListView extends ListView implements AdapterView.OnItemClickListener{
+    private static final String TAG = BookmarkListView.class.getSimpleName();
     private View selectView;
     private int selectNo;
 
@@ -20,7 +20,7 @@ public class BookMarkView extends ListView implements AdapterView.OnItemClickLis
     public View getSelectView(){return selectView;}
     public void setSelectNo(int No){selectNo = No;}
 
-    public BookMarkView(Context context) {
+    public BookmarkListView(Context context) {
         super(context);
     }
 
@@ -39,4 +39,5 @@ public class BookMarkView extends ListView implements AdapterView.OnItemClickLis
             selectNo = i;
         }
     }
+
 }

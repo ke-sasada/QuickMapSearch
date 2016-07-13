@@ -1,11 +1,13 @@
 package jp.ac.titech.itpro.sdl.quickmapsearch;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.hardware.input.InputManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
@@ -16,12 +18,19 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethod;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -35,6 +44,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
@@ -73,11 +83,13 @@ import retrofit2.Response;
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
     private static final String TAG = MainActivity.class.getSimpleName();
-    private static final int MAX_WAYPOINTS = 4;
+    private static final int MAX_SEARCHWORD = 3;
+
     private final static String[] PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.ACCESS_FINE_LOCATION
     };
+
 
     private enum UpdatingState {STOPPED, REQUESTING, STARTED}
     private UpdatingState state = UpdatingState.STOPPED;
@@ -97,13 +109,17 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private FloatingActionButton spinnerButton;
     private FloatingActionButton open_RootListButton;
     private FloatingActionButton close_RootListButton;
-    private Button debug_FileDeleteButton;
     private FloatingActionButton debug_naviTestButton;
+    private FloatingActionButton startNaviButton;
+    private FloatingActionButton endNaviButton;
     private BookMarkAdapter bookmarkAdapter;
     private RootListView rootListView;
-    private BookMarkView bookmarkListView;
+    private BookmarkListView bookmarkListView;
+    private AddBookmarkListView addListView;
+    private AddListAdapter addListAdapter;
     private AlertDialog bookmarkListDialog;
     private AlertDialog addListDialog;
+    private View addListDialogView;
 
     private final static int REQCODE_PERMISSIONS = 1111;
     private int count;
@@ -119,7 +135,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private LinkedHashMap<String, SearchItemList> itemListHashMap;
     private LinkedList<Marker> rootList;
     private List<ResultList> allResult;
-    private HashMap<String, Bitmap> iconMap;
+    private HashMap<String,String> iconMap;
     private SampleAdapter rootAdapter;
 
 
@@ -129,7 +145,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         setContentView(R.layout.activity_main);
 
         bookmarkAdapter = new BookMarkAdapter(this,R.layout.bookmark_itemlayout,R.id.bookmark_text);
-        bookmarkListView = new BookMarkView(this);
+        bookmarkListView = new BookmarkListView(this);
+        addListAdapter = new AddListAdapter(this,R.layout.bookmark_itemlayout,R.id.bookmark_text);
 
         try {
             FileInputStream fis = openFileInput("BookMark.dat");
@@ -172,19 +189,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         debug_naviTestButton.setOnClickListener(onClickListener);
         searchButton = (FloatingActionButton) findViewById(R.id.search_button);
         searchButton.setOnClickListener(onClickListener);
-        debug_FileDeleteButton = (Button) findViewById((R.id.debug_file_delete));
-        debug_FileDeleteButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                try {
-                    Log.d(TAG, "delete file");
-                    deleteFile("BookMark.dat");
-                    Toast.makeText(MainActivity.this, "Debug:Delete 'BookMark.dat' completed", Toast.LENGTH_LONG).show();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+
         spinnerButton = (FloatingActionButton) findViewById(R.id.spinner_button);
         spinnerButton.setOnClickListener(onClickListener);
 
@@ -192,7 +197,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         makerOptionsMap = new HashMap<String,PlaceResult>();
         rootList = new LinkedList<Marker>();
-        iconMap = new HashMap<String, Bitmap>();
         allResult = new ArrayList<ResultList>();
         rootListView = (RootListView)findViewById(R.id.root_listview);
         open_RootListButton = (FloatingActionButton)findViewById(R.id.open_rootbutton);
@@ -206,6 +210,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         rootListView.setAdapter(rootAdapter);
 
 
+        iconMap = new HashMap<String, String>();
+        String[] genre = getResources().getStringArray(R.array.genre_list);
+        String[] icon = getResources().getStringArray(R.array.genre_pic);
+        for(int i = 0; i < genre.length;i++){
+            iconMap.put(genre[i],icon[i]);
+        }
         
         // test data
         if (itemListHashMap == null || itemListHashMap.size() == 0) {
@@ -222,6 +232,25 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             itemListHashMap.put(l.getName(), l);
             //
         }
+
+        startNaviButton = (FloatingActionButton)findViewById(R.id.start_navi);
+        endNaviButton = (FloatingActionButton)findViewById(R.id.end_navi);
+        startNaviButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startNaviButton.setVisibility(View.GONE);
+                endNaviButton.setVisibility(View.VISIBLE);
+                isNaviStarted = false;
+            }
+        });
+        endNaviButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startNaviButton.setVisibility(View.VISIBLE);
+                endNaviButton.setVisibility(View.GONE);
+                isNaviStarted = false;
+            }
+        });
 
         currentLatLng = new LatLng(35.681368,139.766076);
     }
@@ -358,6 +387,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     static boolean firstAnimated = false;
+    boolean isNaviStarted = false;
     @Override
     public void onLocationChanged(android.location.Location location) {
         Log.d(TAG, "onLocationChanged: " + location);
@@ -370,6 +400,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             rootList.add(currentPositionMarker);
             rootList.add(currentPositionMarker);
         }else {
+            if(isNaviStarted){
+
+            }
             rootList.set(0, currentPositionMarker);
             rootList.set(rootList.size() - 1, currentPositionMarker);
         }
@@ -443,8 +476,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 okButton.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        selectedList = itemListHashMap.get(bookmarkAdapter.getItem(bookmarkListView.getSelectNo()));
-                        //spinnerButton.setText(selectedList.getName());
+                        if(bookmarkListView.getSelectView() != null){
+                            TextView text = (TextView)bookmarkListView.getSelectView().findViewById(R.id.bookmark_text);
+                            selectedList = itemListHashMap.get(text.getText());
+
+                        }
                         try {
                             FileOutputStream fos = openFileOutput("BookMark.dat", MODE_PRIVATE);
                             ObjectOutputStream oos = new ObjectOutputStream(fos);
@@ -463,45 +499,93 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
 
         private void createAddListDialog() {
-
-            AlertDialog.Builder builder = new AlertDialog.Builder(
-                    MainActivity.this);
-            builder.setTitle("追加");
-            builder.setPositiveButton("OK", null);
-            builder.setNegativeButton("Cancel",null);
+            EditText title;
             final String[] genreList = getResources().getStringArray(R.array.genre_list);
-            final ArrayList<Integer> checkedItems = new ArrayList<Integer>();
-            builder.setMultiChoiceItems(genreList, null, new DialogInterface.OnMultiChoiceClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i, boolean b) {
-                    if(b)checkedItems.add(i);
-                    else checkedItems.remove((Integer)i);
-                }
-            });
-            addListDialog = builder.create();
-            addListDialog.show();
 
-            Button okButton = addListDialog.getButton(DialogInterface.BUTTON_POSITIVE);
-            okButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    SearchItemList list = new SearchItemList(itemListHashMap.size()+1,String.valueOf(itemListHashMap.size()+1));
-                    for(int i : checkedItems){
-                        if(i < genreList.length) {
-                            SearchItem item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,genreList[i],0.0f);
-                            list.addItem(item);
+            if(addListDialog == null) {
+                LayoutInflater inflater = (LayoutInflater)getSystemService(LAYOUT_INFLATER_SERVICE);
+                addListDialogView = inflater.inflate(R.layout.addbookmark_layout,(ViewGroup)findViewById(R.id.addlayout_root));
+                AlertDialog.Builder builder = new AlertDialog.Builder(
+                        MainActivity.this);
+                builder.setTitle("ブックマークの追加");
+                builder.setPositiveButton("OK", null);
+                builder.setNegativeButton("Cancel", null);
+                builder.setNeutralButton("+",null);
+                builder.setView(addListDialogView);
+                addListView = (AddBookmarkListView)addListDialogView.findViewById(R.id.addlist);
+                addListAdapter.addAll(genreList);
+                addListView.setAdapter(addListAdapter);
+                addListView.setOnItemClickListener(addListView);
+                addListDialog = builder.create();
+                title = (EditText)addListDialogView.findViewById(R.id.titletext);
+                title.setText("ブックマーク"+String.valueOf(itemListHashMap.size()));
+                addListDialog.show();
+                final EditText addWord = (EditText)addListDialog.findViewById(R.id.addWord);
+                addWord.setOnKeyListener(new View.OnKeyListener() {
+                    @Override
+                    public boolean onKey(View view, int i, KeyEvent keyEvent) {
+                        if((keyEvent.getAction() == KeyEvent.ACTION_DOWN) && (i == KeyEvent.KEYCODE_ENTER)){
+                            InputMethodManager inputMethodManager =  (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                            inputMethodManager.hideSoftInputFromWindow(addWord.getWindowToken(), InputMethodManager.RESULT_UNCHANGED_SHOWN);
+                            return true;
+                        }
+                        return false;                    }
+                });
+
+                Button okButton = addListDialog.getButton(DialogInterface.BUTTON_POSITIVE);
+                okButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        EditText title;
+                        title = (EditText)addListDialogView.findViewById(R.id.titletext);
+                        if(!title.getText().toString().equals("")) {
+                            SearchItemList list = new SearchItemList(itemListHashMap.size() + 1, title.getText().toString());
+                            for (int i : addListView.getCheckedNo()) {
+                                if (i < genreList.length) {
+                                    SearchItem item = new SearchItem(SearchItem.SEARCH_TYPE.GENRE, genreList[i], 0.0f);
+                                    list.addItem(item);
+                                }else{
+                                    SearchItem item = new SearchItem(SearchItem.SEARCH_TYPE.WORD,addListAdapter.getItem(i),0.0f);
+                                    list.addItem(item);
+                                }
+                            }
+
+                            if (list.getItemList().size() == 0) {
+                                Toast.makeText(MainActivity.this, "no selected", Toast.LENGTH_LONG).show();
+                            } else {
+                                itemListHashMap.put(list.getName(), list);
+                                bookmarkAdapter.add(list.getName());
+                                bookmarkAdapter.notifyDataSetChanged();
+                                addListDialog.dismiss();
+                                Log.d(TAG, "endaddButtonClick");
+                            }
+                        }else{
+                            Toast.makeText(MainActivity.this,"No Title",Toast.LENGTH_SHORT);
+                        }
+                     }
+                });
+                Button nButton = addListDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+                nButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        EditText addWord = (EditText)addListDialogView.findViewById(R.id.addWord);
+                        if(!addWord.getText().toString().equals("") && addListAdapter.getCount() - genreList.length < MAX_SEARCHWORD){
+                            addListAdapter.add(addWord.getText().toString());
+                            addListAdapter.notifyDataSetChanged();
                         }
                     }
-                    if(list.getItemList().size() == 0){
-                        Toast.makeText(MainActivity.this,"no selected",Toast.LENGTH_LONG).show();
-                    }else {
-                        itemListHashMap.put(list.getName(), list);
-                        bookmarkAdapter.add(list.getName());
-                        addListDialog.dismiss();
-                        Log.d(TAG, "endaddButtonClick");
-                    }
-                }
-            });
+                });
+
+            }else{
+
+                title = (EditText)addListDialogView.findViewById(R.id.titletext);
+                title.setText("ブックマーク"+String.valueOf(itemListHashMap.size()));
+                addListView.clearChecked();
+                addListAdapter.clear();
+                addListAdapter.addAll(genreList);
+                addListAdapter.notifyDataSetChanged();
+                addListDialog.show();
+            }
 
         }
 
@@ -516,10 +600,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         count = 0;
                         for (SearchItem item : selectedList.getItemList()) {
                             {
-                                placeHelper.requestPlaces(item.getWord(), currentLatLng, 500, placeResponceCallBack);
+                                placeHelper.requestPlaces(item.getWord(), item.getSearch_type(), currentLatLng, 500, placeResponceCallBack);
                             }
                         }
                     }else{
+                        Toast.makeText(MainActivity.this,"現在地のみ表示します",Toast.LENGTH_SHORT);
                         Log.d(TAG,"not selected");
                     }
                     break;
@@ -532,6 +617,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         rootList.clear();
                         rootList.add(currentPositionMarker);
                         rootList.add(currentPositionMarker);
+                        rootAdapter.notifyDataSetChanged();
+                        Toast.makeText(MainActivity.this,"ルート情報の削除",Toast.LENGTH_SHORT);
                         Log.d(TAG, "delete PolyLine List");
                     }
                     break;
@@ -597,7 +684,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         @Override
         public void onResponse(Call<PlaceResponce> call, retrofit2.Response<PlaceResponce> response) {
             Log.d(TAG,"onResponse");
-
             googleMap.clear();
             MarkerOptions mo = new MarkerOptions().icon(BitmapDescriptorFactory.defaultMarker(selectedList.getItemList().get(count).getColor()));
             ResultList results = new ResultList(response.body().getResults(),mo);
@@ -622,6 +708,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 if(isExist){
                     itr.remove();
                 }
+                placeResult.setSearchWord(selectedList.getItemList().get(count).getWord());
             }
             allResult.add(results);
             count++;
@@ -631,36 +718,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         Location location = r.getGeometry().getLocation();
                         LatLng latLng = new LatLng(location.getLat(), location.getLng());
                         String name = r.getName();
-                        final String iconURL = r.getIcon();
-                        if(!iconMap.containsKey(iconURL)){
-                            Thread thread = new Thread(new Runnable(){
-                                @Override
-                                public void run(){
-                                    URL url ;
-                                    try {
-                                        url = new URL(iconURL);
-                                        Bitmap bmp = BitmapFactory.decodeStream(url.openConnection().getInputStream());
-                                        iconMap.put(iconURL,bmp);
-                                    } catch (Exception e) {
-                                        e.printStackTrace();
-                                    }
-                                    Log.d(TAG,"endBitMapThread");
-                                }
-                            });
-                            thread.start();
-                            try {
-                                thread.join();
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                            Log.d(TAG,"endMainThread");
+                        Marker m;
+                        if(iconMap.containsKey(r.getSearchWord())) {
+                            String iconName = iconMap.get(r.getSearchWord());
+                            BitmapDescriptor icon = BitmapDescriptorFactory.fromResource(getResources().getIdentifier(iconName, "drawable", "jp.ac.titech.itpro.sdl.quickmapsearch"));
+
+                            m = googleMap.addMarker(resultList.getMarkerOptions().position(latLng).title(name)
+                                    .icon(icon));
+                        }else{
+                            m = googleMap.addMarker(resultList.getMarkerOptions().position(latLng).title(name)
+                                    );
                         }
-                        if(iconMap.containsKey(iconURL)) {
-                            Marker m = googleMap.addMarker(resultList.getMarkerOptions().position(latLng).title(name)
-                                    .icon(BitmapDescriptorFactory.fromBitmap(iconMap.get(iconURL))));
-                            r.setMarkerOptions(resultList.getMarkerOptions());
-                            makerOptionsMap.put(m.getId(),r);
-                        }
+                        r.setMarkerOptions(resultList.getMarkerOptions());
+                        makerOptionsMap.put(m.getId(),r);
+
                     }
                 }
                 currentPositionMarker = googleMap.addMarker(new MarkerOptions().position(currentLatLng).title("現在位置").flat(true));
@@ -724,6 +795,81 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             startDirectionRequest();
             return super.onStopDrag(positionFrom, positionTo);
         }
+    }
+
+    class BookMarkAdapter extends ArrayAdapter<String> {
+
+        private LayoutInflater inflater;
+        private MainActivity mainActivity;
+        String item;
+
+        public BookMarkAdapter(Context context, int resource) {
+            super(context, resource);
+        }
+
+        public BookMarkAdapter(Context context, int resource, int textViewResourceId) {
+            super(context, resource, textViewResourceId);
+            inflater = (LayoutInflater)context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        }
+
+        public BookMarkAdapter(Context context, int resource, String[] objects) {
+            super(context, resource, objects);
+        }
+
+
+        public View getView(int position, View convertView, ViewGroup parent){
+            if(convertView == null){
+                convertView = inflater.inflate(R.layout.bookmark_itemlayout,null);
+            }
+            item = this.getItem(position);
+
+            ImageButton imageButton = (ImageButton)convertView.findViewById(R.id.bookmark_delete);
+            imageButton.setTag(item);
+
+            TextView textView = (TextView) convertView.findViewById(R.id.bookmark_text);
+            if(textView != null){
+                textView.setText(item);
+            }
+            return convertView;
+
+        }
+    }
+
+    class AddListAdapter extends ArrayAdapter<String> {
+
+        private LayoutInflater inflater;
+        private MainActivity mainActivity;
+        String item;
+
+        public AddListAdapter(Context context, int resource, int textViewResourceId) {
+            super(context, resource, textViewResourceId);
+            inflater = (LayoutInflater)context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        }
+
+        public View getView(int position, View convertView, ViewGroup parent){
+            if(convertView == null){
+                convertView = inflater.inflate(R.layout.addbookmark_itemlayout,null);
+            }
+            item = this.getItem(position);
+
+            TextView textView = (TextView) convertView.findViewById(R.id.bookmark_text);
+            if(textView != null){
+                textView.setText(item);
+            }
+            return convertView;
+
+        }
+    }
+
+
+    public void removeItem(View v){
+        if(itemListHashMap.get(String.valueOf(v.getTag())).equals(selectedList)){
+            selectedList = null;
+            bookmarkListView.setSelectView(null);
+        }
+        bookmarkAdapter.remove(String.valueOf(v.getTag()));
+        itemListHashMap.remove(String.valueOf(v.getTag()));
+        bookmarkAdapter.notifyDataSetChanged();
     }
 
 }

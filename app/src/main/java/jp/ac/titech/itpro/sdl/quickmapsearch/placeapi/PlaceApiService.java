@@ -15,5 +15,6 @@ public interface PlaceApiService {
                                       @Query("location") String location,
                                       @Query("radius") String radius,
                                       @Query("sensor") String sensor,
+                                      @Query("keyword") String keyword,
                                       @Query("key") String key);
 }

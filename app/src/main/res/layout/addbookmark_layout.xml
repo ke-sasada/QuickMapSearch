@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:id="@+id/addlayout_root"
+    >
+
+    <EditText
+        android:layout_width="637dp"
+        android:layout_height="wrap_content"
+        android:id="@+id/titletext"
+        android:layout_gravity="center_horizontal"
+        android:textAlignment="center"
+        android:hint="タイトル"
+        android:maxLength="20"
+        android:textSize="30dp"
+        android:inputType="text" />
+
+    <jp.ac.titech.itpro.sdl.quickmapsearch.AddBookmarkListView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/addlist"/>
+
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/addWord"
+        android:textAlignment="center"
+        android:hint="追加"
+        android:textSize="30dp"
+        android:inputType="text"
+        android:layout_gravity="center_horizontal" />
+</LinearLayout>

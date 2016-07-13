@@ -19,6 +19,7 @@ public class PlaceResult {
     private String[] types;
     private String vicinity;
     private MarkerOptions markerOptions;
+    private String searchWord;
 
     public PlaceResult(Geometry geometry, String icon,
                        String id, String  name, String place_id, String rating, String reference, String[] types, String vicinity){
@@ -108,5 +109,9 @@ public class PlaceResult {
     public void setMarkerOptions(MarkerOptions m){ this.markerOptions = m;}
 
     public MarkerOptions getMarkerOptions(){return markerOptions;}
+
+    public void setSearchWord(String word){searchWord = word;}
+
+    public String getSearchWord(){return searchWord;}
 
 }
