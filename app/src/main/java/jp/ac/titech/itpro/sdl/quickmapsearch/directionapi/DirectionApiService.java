@@ -13,7 +13,8 @@ import retrofit2.http.Query;
 public interface DirectionApiService {
     @Headers("Accept-Language: ja")
     @GET("/maps/api/directions/json")
-    Call<DirectionResponce> requestPlaces(@Query("origin") String types,
+    Call<DirectionResponce> requestPlaces(@Query("mode") String mode,
+                                          @Query("origin") String types,
                                           @Query("destination") String location,
                                           @Query("waypoints") String waypoints,
                                           @Query("key") String key);

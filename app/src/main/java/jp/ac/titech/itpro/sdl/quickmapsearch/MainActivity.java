@@ -27,6 +27,7 @@ import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -158,10 +159,32 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 bookmarkListView.setOnItemClickListener(bookmarkListView);
             }
             bookmarkListView.setAdapter(bookmarkAdapter);
-
+            ois.close();
             Log.d(TAG, "loading 'BookMark.dat' completed");
         } catch (FileNotFoundException e) {
-            Log.d(TAG, "File not Found. Start no file.");
+            itemListHashMap = new LinkedHashMap<String,SearchItemList>();
+            SearchItem s = new SearchItem(SearchItem.SEARCH_TYPE.GENRE,"book_store",0);
+            SearchItemList l = new SearchItemList(0,"本屋");
+            l.addItem(s);
+            itemListHashMap.put(l.getName(),l);
+            try{
+                FileOutputStream fos = openFileOutput("BookMark.dat", MODE_PRIVATE);
+                ObjectOutputStream oos = new ObjectOutputStream(fos);
+                oos.writeObject(itemListHashMap);
+                for(SearchItemList list:itemListHashMap.values()) {
+                    bookmarkAdapter.add(list.getName());
+                }
+                if(itemListHashMap.size() > 0){
+                    bookmarkListView.setSelectNo(0);
+                    bookmarkListView.setOnItemClickListener(bookmarkListView);
+                }
+                bookmarkListView.setAdapter(bookmarkAdapter);
+                oos.close();
+            }catch (Exception ex){
+                e.printStackTrace();
+            }
+
+            Log.d(TAG, "saving 'BookMark.dat' completed");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -358,7 +381,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             rootList.add(currentPositionMarker);
         }else {
             if(isNaviStarted){
-
+                googleMap.moveCamera(CameraUpdateFactory.newLatLng(currentLatLng));
             }
             rootList.set(0, currentPositionMarker);
             rootList.set(rootList.size() - 1, currentPositionMarker);

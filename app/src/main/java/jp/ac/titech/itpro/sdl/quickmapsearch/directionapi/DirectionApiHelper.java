@@ -43,6 +43,7 @@ public class DirectionApiHelper {
         Marker m2 = pointList.getLast();
 
         String waypoints = new String();
+        waypoints += "optimize:true|";
 
         for(Marker m:pointList){
             if(!m.equals(m1) ||!m.equals(m2)){
@@ -51,6 +52,7 @@ public class DirectionApiHelper {
         }
 
         Call<DirectionResponce> call = service.requestPlaces(
+                "walking",
                 String.valueOf(m1.getPosition().latitude) + "," + String.valueOf(m1.getPosition().longitude),
                 String.valueOf(m2.getPosition().latitude) + "," + String.valueOf(m2.getPosition().longitude),
                 waypoints,

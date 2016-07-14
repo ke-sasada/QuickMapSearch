@@ -5,16 +5,16 @@
     <string name="menu_map">test</string>
     <string-array name="genre_list">
         <item>police</item>
-        <item>bank</item>
         <item>post_office</item>
         <item>hospital</item>
         <item>library</item>
+        <item>book_store</item>
     </string-array>
     <string-array name="genre_pic">
         <item>police</item>
-        <item>bank</item>
         <item>postal</item>
         <item>hospital</item>
+        <item>library</item>
         <item>library</item>
     </string-array>
 </resources>
