@@ -1,2 +1,6 @@
 # QuickMapSearch
 for itsp software development
+
+あらかじめブックマークとして検索ワードとジャンルを保存しておいて、Google Map上で現在地の表示の際に検索結果を同時に表示するAndroidアプリ  
+検索結果で一度に複数の場所を経由地としてルート検索できる
+
